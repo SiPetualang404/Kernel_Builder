@@ -75,10 +75,13 @@ jobs:
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
           fi
 
+          SERIES="6.6"
+          echo "SERIES=$SERIES" >> $GITHUB_ENV
           if [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
-            SERIES="6.6"
             OS_PATCH="2024-11"
-            echo "SERIES=$SERIES" >> $GITHUB_ENV
+            echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
+          elif [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
+            OS_PATCH="lts"
             echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
           fi
           
@@ -147,14 +150,14 @@ jobs:
           ccache --version
           ccache --max-size=3G
           ccache --set-config=compression=true
-          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ env.BRANCH_NAME }}" >> $GITHUB_ENV
-          mkdir -p $HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ env.BRANCH_NAME }}
+          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+          mkdir -p $HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}
           
       - name: Restore ccache from cache
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ env.BRANCH_NAME }}
+          key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}
           restore-keys: |
             ccache-
 
