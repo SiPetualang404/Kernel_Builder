@@ -483,12 +483,12 @@ jobs:
           
           # KSU Configuration
           set_config CONFIG_KSU y
-          if [ "${{ inputs.kernelsu_variant }}" == "KernelSU-Next" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
             set_config CONFIG_KSU_SUSFS_SUS_SU n
             set_config CONFIG_KSU_KPROBES_HOOK n
             set_config CONFIG_KSU_MANUAL_HOOK y
-          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU-Ultra" ]; then
-            if [ "${{ inputs.use_kpm }}" == "true" ]; then
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            if [ "${{ inputs.use_kpm }}" = "true" ]; then
               KPM="KPM"
               echo "MODEKPM=$KPM" >> $GITHUB_ENV
               set_config CONFIG_KPM y
@@ -563,7 +563,7 @@ jobs:
           set_config CONFIG_AUTOFDO_CLANG y
           set_config CONFIG_WIREGUARD y
           
-          if [ "${{ inputs.use_bbr }}" == "true" ]; then
+          if [ "${{ inputs.use_bbr }}" = "true" ]; then
             # BBR Configuration
             set_config CONFIG_NET_SCH_FQ y
             set_config CONFIG_TCP_CONG_ADVANCED y
@@ -575,7 +575,7 @@ jobs:
             set_config CONFIG_DEFAULT_BBR y
           fi
 
-          if [ "${{ inputs.use_net }}" == "true" ]; then
+          if [ "${{ inputs.use_net }}" = "true" ]; then
             # NET Configuration
             set_config CONFIG_NETFILTER_XT_MATCH_ADDRTYPE y
             set_config CONFIG_NETFILTER_XT_SET y
