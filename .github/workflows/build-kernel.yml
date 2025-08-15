@@ -80,7 +80,7 @@ jobs:
           if [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
             OS_PATCH="2024-11"
             echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
-          elif [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
+          elif [ "${{ inputs.kernel_version }}" = "6.6.xx" ]; then
             OS_PATCH="lts"
             echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
           fi
@@ -168,7 +168,7 @@ jobs:
           path: |
             kernel-build-tools
             mkbootimg
-          key: toolchain-${{ runner.os }}-v1
+          key: toolchain-${{ runner.os }}-2024
 
       - name: Download toolchain (if cache not found)
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
