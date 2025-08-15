@@ -337,90 +337,51 @@ jobs:
             fi
           fi
 
-      # - name: Upgrade LZ4 to v1.10.0
-      #   run: |
-      #     cd kernel_workspace/common
-          
-      #     # Delete old files in lz4 library
-      #     files=(
-      #       "lib/lz4/lz4_compress.c"
-      #       "lib/lz4/lz4_decompress.c"
-      #       "lib/lz4/lz4defs.h"
-      #       "lib/lz4/lz4hc_compress.c"
-      #     )
-
-      #     for file in "${files[@]}"; do
-      #       if [ -e "$file" ]; then
-      #         rm -rf "$file"
-      #         echo "$file Deleted"
-      #       else
-      #         echo "$file Does not exist"
-      #       fi
-      #     done
-
-      #     cp -r ../../kernel_patches/zram/lz4/* ./lib/lz4/
-      #     cp -r ../../kernel_patches/zram/include/linux/* ./include/linux/
-      #     cp -r ../../kernel_patches/zram/${{ env.SERIES }}/lz4_1.10.0.patch ./
-      #     patch -p1 -F 3 --fuzz=5 < lz4_1.10.0.patch || true
-
-      #     # Check if the file exists
-      #     if [ -f "fs/f2fs/Makefile" ]; then
-      #       # Check whether the specified line is contained
-      #       if ! grep -qF "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" "fs/f2fs/Makefile"; then
-      #         echo "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" >> "fs/f2fs/Makefile"
-      #         echo "Added: f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o"
-      #       else
-      #         echo "File already contains: f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o"
-      #       fi
-      #     else
-      #       echo "File does not exist: fs/f2fs/Makefile"
-      #     fi
-
-      - name: Upgrade LZ4
+      - name: Updated LZ4 to v1.10.0
         run: |
           LZ4_VERSION="1.10.0"
           LZ4_DOWNLOAD_URL="https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz"
           cd kernel_workspace/common
           mkdir -p lz4_temp && cd lz4_temp
-          echo "下载LZ4 ${LZ4_VERSION}源码..."
+          echo "Download LZ4 ${LZ4_VERSION} source code..."
           curl -Ls "${LZ4_DOWNLOAD_URL}" -o lz4.tar.gz
           tar -zxf lz4.tar.gz --strip-components=1
 
-          # 复制文件并使用独立命名，避免与LZ4K冲突
-          echo "复制LZ4文件到内核目录..."
-          # 源码文件（添加"lz4v2_"前缀）
+          # Copy the files and use independent names to avoid conflicts with LZ4K
+          echo "Copy the LZ4 file to the kernel directory..."
+          # Source code file (add "lz4v2_" prefix)
           cp lib/lz4.c ../lib/lz4v2_core.c
           cp lib/lz4.h ../lib/lz4v2_core.h
           cp lib/lz4hc.c ../lib/lz4v2_hc.c
           cp lib/lz4hc.h ../lib/lz4v2_hc.h
-          # 头文件（放在独立路径）
+          # Header file (put in a separate path）
           mkdir -p ../include/linux/lz4v2
           cp lib/lz4.h ../include/linux/lz4v2/lz4.h
           cp lib/lz4hc.h ../include/linux/lz4v2/lz4hc.h
 
-          # 全局重命名函数和宏（彻底隔离命名空间）
-          echo "重命名符号以避免冲突..."
-          # 核心压缩函数重命名
+          # Globally rename functions and macros (complete namespace isolation)
+          echo "Rename symbols to avoid conflicts..."
+          # Core compression functions renamed
           sed -i 's/LZ4_compress_default/lz4v2_compress_default/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
           sed -i 's/LZ4_decompress_safe/lz4v2_decompress_safe/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
-          # HC高压缩函数重命名
+          # HC high compression function rename
           sed -i 's/LZ4_compress_HC/lz4v2_compress_HC/g' ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
-          # 内部宏和辅助函数重命名
+          # Internal macros and helper functions renamed
           sed -i 's/LZ4_/LZ4V2_/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
           
-          # 添加内核兼容性适配
-          echo "添加内核适配代码..."
-          # 引入内核必要头文件
+          # Add kernel compatibility adaptation
+          echo "Add kernel adaptation code..."
+          # Introduce necessary kernel header files
           sed -i '1i#include <linux/types.h>' ../lib/lz4v2_core.c
           sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_core.c
           sed -i '3i#include <linux/module.h>' ../lib/lz4v2_core.c
-          # HC文件同样处理
+          # HC files are processed similarly
           sed -i '1i#include <linux/types.h>' ../lib/lz4v2_hc.c
           sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_hc.c
           sed -i '3i#include <linux/module.h>' ../lib/lz4v2_hc.c
 
-          # 添加模块声明（符合内核规范）
-          echo "添加模块元数据..."
+          # Add module declaration (conforming to kernel spec)
+          echo "Add module metadata..."
           cat >> ../lib/lz4v2_core.c << 'EOF'
           MODULE_LICENSE("GPL");
           MODULE_DESCRIPTION("LZ4 1.10.0 Compression (v2)");
@@ -436,16 +397,16 @@ jobs:
           EXPORT_SYMBOL(lz4v2_compress_HC);
           EOF
 
-          # 更新Makefile确保编译（独立于LZ4K）
-          echo "更新Makefile配置..."
+          # Update Makefile to ensure compilation
+          echo "Update Makefile configuration..."
           if ! grep -q "lz4v2_core.o" ../lib/Makefile; then
             echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_core.o" >> ../lib/Makefile
             echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_hc.o" >> ../lib/Makefile
           fi
 
-          # 清理临时文件
+          # Clean temporary files
           cd .. && rm -rf lz4_temp
-          echo "LZ4 ${LZ4_VERSION}集成完成（与LZ4K兼容）"
+          echo "LZ4 ${LZ4_VERSION} integration completed"
           
       - name: Apply ECN and TCP Pacing Tweaks
         run: |
@@ -685,7 +646,7 @@ jobs:
           >KernelVer: $ESCAPED_KERNEL_VER
           >DriverKSU: $ESCAPED_KSU_VARIANT
           >HookMode: ${{ inputs.hook }} Hook
-          >SUSFS ඞ $ESCAPED_SUSFS_VERS
+          >SUSFS ඞ: $ESCAPED_SUSFS_VER
           EOF
           
           cat >> release.txt << 'EOF'
@@ -695,8 +656,7 @@ jobs:
           [+] TCP Pacing Tweaks
           [+] Hibernation (LZ4) Support
           [+] BBR Algorithm + ECN Support
-          [+] TMPFS XATTR + POSIX ACL Support
-          ```
+          [+] TMPFS XATTR + POSIX ACL Support```
           ⬇ How To Flash:
           >Use flashing software, such as [KernelFlasher](https://github.com/fatalcoder524/KernelFlasher/releases/download/v1.6.0/KernelFlasher_1.6.0.apk) or [HorizonKernelFlasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/v1.3/app-release.apk) for flashing the kernel \(Give root access to the Application\)
           EOF
