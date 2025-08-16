@@ -343,12 +343,8 @@ jobs:
       - name: Fix ksu_trace.h macro conflict
         run: |
           cd kernel_workspace/common
-          FILE=$(find drivers -type f -name "ksu_trace.h" | head -n1)
-          echo "Found: $FILE"
-          FILE=$(find drivers -type f -name "ksu_trace.h" | head -n1)
-          echo "Found: $FILE"
-          sed -i '40i#ifndef TRACE_INCLUDE_PATH' "$FILE"
-          sed -i '42i#endif' "$FILE"
+          sed -i '40i#ifndef TRACE_INCLUDE_PATH' "drivers/susfs/kernelsu/ksu_trace.h"
+          sed -i '42i#endif' "drivers/susfs/kernelsu/ksu_trace.h"
           
       - name: Updated LZ4 to v1.10.0
         run: |
