@@ -455,14 +455,7 @@ jobs:
             MODEKPM=$([ "${{ inputs.use_kpm }}" = "true" ] && echo "KPM" || echo "NoKPM")
             [ "$MODEKPM" = "KPM" ] && set_config CONFIG_KPM y
             echo "MODEKPM=$MODEKPM" >> $GITHUB_ENV
-            set_config CONFIG_KALLSYMS y
-            set_config CONFIG_KALLSYMS_ALL y
-            set_config CONFIG_KALLSYMS_BASE_RELATIVE y
-            set_config CONFIG_MODULES y
-            set_config CONFIG_MODULE_UNLOAD y
-            set_config CONFIG_BPF y
-            set_config CONFIG_KALLSYMS_LOOKUP y
-            set_config CONFIG_EMBEDDED y
+            
             if [ "${{ inputs.hook }}" = "Manual" ]; then
               set_config CONFIG_KSU_SUSFS_SUS_SU n
               set_config CONFIG_KSU_MANUAL_HOOK y
