@@ -345,9 +345,10 @@ jobs:
           cd kernel_workspace/common
           FILE=$(find drivers -type f -name "ksu_trace.h" | head -n1)
           echo "Found: $FILE"
-          sed -i 's|#define TRACE_INCLUDE_PATH .|#ifndef TRACE_INCLUDE_PATH\
-            #define TRACE_INCLUDE_PATH .\
-            #endif|' "$FILE"
+          FILE=$(find drivers -type f -name "ksu_trace.h" | head -n1)
+          echo "Found: $FILE"
+          sed -i '40i#ifndef TRACE_INCLUDE_PATH' "$FILE"
+          sed -i '42i#endif' "$FILE"
           
       - name: Updated LZ4 to v1.10.0
         run: |
