@@ -339,13 +339,6 @@ jobs:
               patch -p1 -F 3 < tracepoint_hooks.patch
             fi
           fi
-
-      - name: Fix ksu_trace.h macro conflict
-        run: |
-          cd kernel_workspace/common
-          sed -i 's|#define TRACE_INCLUDE_PATH .|#ifndef TRACE_INCLUDE_PATH\
-          #define TRACE_INCLUDE_PATH .\
-          #endif|' drivers/kernelsu/ksu_trace.h
           
       - name: Updated LZ4 to v1.10.0
         run: |
