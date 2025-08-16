@@ -342,7 +342,7 @@ jobs:
 
       - name: Fix ksu_trace.h macro conflict
         run: |
-          cd kernel_workspace
+          cd kernel_workspace/common
           sed -i 's|#define TRACE_INCLUDE_PATH .|#ifndef TRACE_INCLUDE_PATH\
           #define TRACE_INCLUDE_PATH .\
           #endif|' drivers/kernelsu/ksu_trace.h
