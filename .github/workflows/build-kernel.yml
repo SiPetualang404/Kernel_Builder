@@ -344,7 +344,7 @@ jobs:
         run: |
           sed -i 's|#define TRACE_INCLUDE_PATH .|#ifndef TRACE_INCLUDE_PATH\
           #define TRACE_INCLUDE_PATH .\
-          #endif|' drivers/kernelsu/ksu_trace.h
+          #endif|' ../../drivers/kernelsu/ksu_trace.h
           
       - name: Updated LZ4 to v1.10.0
         run: |
