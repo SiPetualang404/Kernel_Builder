@@ -159,8 +159,6 @@ jobs:
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}
-          restore-keys: |
-            ccache-
 
       # - name: Cache toolchain
       #   id: cache-toolchain
@@ -207,8 +205,6 @@ jobs:
         with:
           path: ${{ env.REPO_CACHE_DIR }}
           key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
-          restore-keys: |
-            repo-
       
       - name: Initialize repo and sync
         shell: bash
