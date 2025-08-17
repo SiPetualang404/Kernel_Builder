@@ -47,11 +47,11 @@ on:
         required: true
         type: boolean
         default: true
-      use_kpm:
-        description: 'Enables the KPM Patch (may slightly increase power consumption)'
-        required: true
-        type: boolean
-        default: false
+      # use_kpm:
+      #   description: 'Enables the KPM Patch (may slightly increase power consumption)'
+      #   required: true
+      #   type: boolean
+      #   default: false
         
 jobs:
   build-kernel-kernelsu-susfs:
@@ -199,11 +199,13 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
           chmod a+rx ~/repo
           sudo mv ~/repo /usr/local/bin/repo
+          echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+          mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
 
       - name: Restore repo cache
         uses: actions/cache@v4
         with:
-          path: kernel_workspace/.repo
+          path: ${{ env.REPO_CACHE_DIR }}
           key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
           restore-keys: |
             repo-
@@ -585,17 +587,17 @@ jobs:
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
 
-      - name: 📦 Apply KPM Patch (SukiSU only)
-        if: ${{ inputs.use_kpm }}
-        run: |
-          cd kernel_workspace/common/out/arch/arm64/boot
-          TAG=$(curl -s https://api.github.com/repos/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases | jq -r 'map(select(.prerelease == false and .draft == false)) | first | .tag_name')
-          echo "Latest tag is: $TAG"
-          curl -LSs -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/$TAG/patch_linux"
-          chmod +x patch_linux
-          ./patch_linux
-          rm -f Image
-          mv oImage Image
+      # - name: 📦 Apply KPM Patch (SukiSU only)
+      #   if: ${{ inputs.use_kpm }}
+      #   run: |
+      #     cd kernel_workspace/common/out/arch/arm64/boot
+      #     TAG=$(curl -s https://api.github.com/repos/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases | jq -r 'map(select(.prerelease == false and .draft == false)) | first | .tag_name')
+      #     echo "Latest tag is: $TAG"
+      #     curl -LSs -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/$TAG/patch_linux"
+      #     chmod +x patch_linux
+      #     ./patch_linux
+      #     rm -f Image
+      #     mv oImage Image
           
       - name: 📦 Make AnyKernel3
         run: |
