@@ -240,7 +240,18 @@ jobs:
       
           echo "Syncing repo..."
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
-      
+
+          ls -la
+
+          cd common
+          echo "babiusabfbjdk hjsk ih a"
+          ls -la
+          # aria2c -s16 -x16 -k1M https://github.com/aosp-mirror/kernel_common/archive/refs/heads/android15-6.6-2024-08.zip -o common.zip
+          # ls -la
+          # unzip -q common.zip
+          # mv "kernel_common-android15-6.6-2024-08" common
+          # rm -rf common.zips
+          
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
           rm -rf ./msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
