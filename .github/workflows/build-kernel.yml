@@ -205,6 +205,8 @@ jobs:
         with:
           path: ${{ env.REPO_CACHE_DIR }}
           key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
+          restore-keys: |
+            repo-
       
       - name: Initialize repo and sync
         shell: bash
