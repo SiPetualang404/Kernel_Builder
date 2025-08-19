@@ -247,10 +247,10 @@ jobs:
           # echo "babiusabfbjdk hjsk ih a"
           # ls -la
           aria2c -s16 -x16 -k1M https://github.com/aosp-mirror/kernel_common/archive/refs/heads/android15-6.6-2024-08.zip -o common.zip
-          ls -la
           unzip -q common.zip
           mv "kernel_common-android15-6.6-2024-08" common
           rm -rf common.zip
+          ls -al
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
