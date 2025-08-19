@@ -585,22 +585,21 @@ jobs:
           max_attempts: 3
           retry_on: timeout
           command: |
-            # set -e
-            # set -x
-            # cd kernel_workspace/common
+            set -e
+            set -x
+            cd kernel_workspace/common
             
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./build.config.gki.aarch64
             sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./build.config.gki.aarch64
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
             
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
-            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
+            # export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
 
-            WORKDIR="$(pwd)"
-            export PATH="$WORKDIR/kernel_workspace/clang20/bin:$PATH"
-            export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
-            CLANG_DIR="$WORKDIR/kernel_workspace/clang20/bin"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/clang20/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/build-tools/bin:$PATH"
+            CLANG_DIR="${GITHUB_WORKSPACE}/kernel_workspace/clang20/bin"
             CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
             LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
             echo "编译器信息:"
