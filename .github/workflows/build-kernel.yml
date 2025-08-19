@@ -241,16 +241,22 @@ jobs:
           # echo "Syncing repo..."
           # repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
-          # ls -la
-
-          # cd common
-          # echo "babiusabfbjdk hjsk ih a"
-          # ls -la
           aria2c -s16 -x16 -k1M https://github.com/aosp-mirror/kernel_common/archive/refs/heads/android15-6.6-2024-08.zip -o common.zip
           unzip -q common.zip
           mv "kernel_common-android15-6.6-2024-08" common
           rm -rf common.zip
-          ls -al
+
+          echo "正在克隆llvm-Clang20工具链..."
+          rm -rf clang20
+          mkdir -p clang20
+          aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip
+          unzip -q clang.zip -d clang20
+          rm -rf clang.zip
+          echo "正在克隆构建工具..."
+          rm -rf build-tools
+          aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip -o build-tools.zip
+          unzip -q build-tools.zip
+          rm -rf build-tools.zip
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -579,9 +585,9 @@ jobs:
           max_attempts: 3
           retry_on: timeout
           command: |
-            set -e
-            set -x
-            cd kernel_workspace/common
+            # set -e
+            # set -x
+            # cd kernel_workspace/common
             
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./build.config.gki.aarch64
             sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./build.config.gki.aarch64
@@ -590,6 +596,17 @@ jobs:
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
+
+            WORKDIR="$(pwd)"
+            export PATH="$WORKDIR/kernel_workspace/clang20/bin:$PATH"
+            export PATH="$WORKDIR/kernel_workspace/build-tools/bin:$PATH"
+            CLANG_DIR="$WORKDIR/kernel_workspace/clang20/bin"
+            CLANG_VERSION="$($CLANG_DIR/clang --version | head -n 1)"
+            LLD_VERSION="$($CLANG_DIR/ld.lld --version | head -n 1)"
+            echo "编译器信息:"
+            echo "Clang版本: $CLANG_VERSION"
+            echo "LLD版本: $LLD_VERSION"
+            pahole_version=$(pahole --version 2>/dev/null | head -n1); [ -z "$pahole_version" ] && echo "pahole版本：未安装" || echo "pahole版本：$pahole_version"
 
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
