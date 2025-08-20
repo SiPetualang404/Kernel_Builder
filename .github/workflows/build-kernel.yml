@@ -223,7 +223,7 @@ jobs:
             echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
           fi
 
-          cd prebuilts/gcc
+          cd prebuilts/gcc/linux-x86
           ls -la
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
