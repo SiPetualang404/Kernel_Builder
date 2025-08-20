@@ -159,38 +159,6 @@ jobs:
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}
-
-      # - name: Cache toolchain
-      #   id: cache-toolchain
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       kernel-build-tools
-      #       mkbootimg
-      #     key: toolchain-${{ runner.os }}-2024
-
-      # - name: Download toolchain (if cache not found)
-      #   if: steps.cache-toolchain.outputs.cache-hit != 'true'
-      #   run: |
-      #     git clone https://android.googlesource.com/kernel/prebuilts/build-tools -b main-kernel-build-2024 --depth 1 kernel-build-tools
-      #     git clone https://android.googlesource.com/platform/system/tools/mkbootimg -b main-kernel-build-2024 --depth 1 mkbootimg
-
-      # - name: Set environment variables
-      #   run: |
-      #     echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
-      #     echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
-
-      # - name: Set boot sign key
-      #   env:
-      #     BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
-      #   run: |
-      #     if [ ! -z "$BOOT_SIGN_KEY" ]; then
-      #       echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-      #       echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-      #     else
-      #       openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-      #       echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-      #     fi
           
       - name: Install Repo
         run: |
@@ -211,7 +179,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p kernel_workspace && cd kernel_workspace
-      
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git gcc
+          ls gcc/bin
+          
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ env.SERIES }}-${{ env.OS_PATCH }}"
           REMOTE_URL="https://android.googlesource.com/kernel/common"
       
@@ -268,7 +238,7 @@ jobs:
           ls -la
           rm -rf ./gcc
           rm -rf ./clang-tools
-          rm -rf ./build-tools
+          #rm -rf ./build-tools
           rm -rf ./rust
           rm -rf ./tradefed
           rm -rf ./asuite
@@ -277,7 +247,7 @@ jobs:
           #rm -rf ./kernel-build-tools
           echo "prebuilts ke folder itu"
           ls -la
-          cd kernel-build-tools
+          cd build-tools
           echo "kernel-build-tools ke folder itu"
           ls -la
           
@@ -610,10 +580,13 @@ jobs:
             
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
             export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/gcc/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
 
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
+            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
+            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
 
       # - name: 📦 Apply KPM Patch (SukiSU only)
       #   if: ${{ inputs.use_kpm }}
