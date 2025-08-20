@@ -205,7 +205,7 @@ jobs:
           #   echo "Switching to deprecated/${FORMATTED_BRANCH} in manifest"
           #   sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
           # fi
-
+          
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.56.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
@@ -547,7 +547,12 @@ jobs:
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./build.config.gki.aarch64
             sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./build.config.gki.aarch64
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
-            
+
+            echo "--- Clang Version ---"
+            clang --version
+            echo "--- GCC Version ---"
+            aarch64-linux-gnu-gcc -v
+                
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
             export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
             export PATH="${GITHUB_WORKSPACE}/kernel_workspace/gcc/bin:$PATH"
