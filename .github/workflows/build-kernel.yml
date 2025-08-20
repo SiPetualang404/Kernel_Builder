@@ -223,7 +223,7 @@ jobs:
             echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
           fi
 
-          cd prebuilts/gcc/linux-x86
+          cd prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8
           ls -la
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
