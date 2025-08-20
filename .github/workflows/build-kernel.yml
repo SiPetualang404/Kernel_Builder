@@ -277,6 +277,10 @@ jobs:
           #rm -rf ./kernel-build-tools
           echo "prebuilts ke folder itu"
           ls -la
+          cd kernel-build-tools
+          echo "kernel-build-tools ke folder itu"
+          ls -la
+          
           
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
