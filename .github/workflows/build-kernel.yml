@@ -241,10 +241,16 @@ jobs:
           echo "Syncing repo..."
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
-          ls -la
-          cd common
-          echo "masuk ke folder common"
-          ls -la
+          # ls -la
+          # cd common
+          # echo "masuk ke folder common"
+          # ls -la
+
+          rm -rf ./tools
+          rm -rf ./kernel
+          rm -rf ./build
+          rm -rf ./common-modules
+          rm -rf ./MODULE.bazel
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
