@@ -254,8 +254,6 @@ jobs:
           rm -rf ./WORKSPACE
           rm -rf ./WORKSPACE.bzlmod
           rm -rf ./external
-          rm -rf ./prebuilts/gcc ./prebuilts/clang-tools ./prebuilts/build-tools ./prebuilts/rust
-          rm -rf ./prebuilts/tradefed ./prebuilts/asuite  ./prebults/jdk ./prebults/ndk-r26 ./prebults/kernel-build-tools
           ls -la
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -267,6 +265,15 @@ jobs:
           fi
 
           cd prebuilts
+          ls -la
+          rm -rf ./prebuilts/gcc ./prebuilts/clang-tools
+          rm -rf ./prebuilts/build-tools
+          rm -rf ./prebuilts/rust
+          rm -rf ./prebuilts/tradefed 
+          rm -rf ./prebuilts/asuite
+          rm -rf ./prebults/jdk 
+          rm -rf ./prebults/ndk-r26 
+          rm -rf ./prebults/kernel-build-tools
           echo "prebuilts ke folder itu"
           ls -la
           
