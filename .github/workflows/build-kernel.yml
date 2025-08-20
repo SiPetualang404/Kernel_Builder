@@ -274,7 +274,7 @@ jobs:
           rm -rf ./asuite
           rm -rf ./jdk
           rm -rf ./ndk-r26
-          rm -rf ./kernel-build-tools
+          #rm -rf ./kernel-build-tools
           echo "prebuilts ke folder itu"
           ls -la
           
