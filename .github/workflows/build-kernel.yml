@@ -180,39 +180,38 @@ jobs:
           set -euo pipefail
           mkdir -p kernel_workspace && cd kernel_workspace
           
-          FORMATTED_BRANCH="${{ inputs.android_version }}-${{ env.SERIES }}-${{ env.OS_PATCH }}"
-          REMOTE_URL="https://android.googlesource.com/kernel/common"
+          # FORMATTED_BRANCH="${{ inputs.android_version }}-${{ env.SERIES }}-${{ env.OS_PATCH }}"
+          # REMOTE_URL="https://android.googlesource.com/kernel/common"
       
-          echo "Checking if remote branch exists: $FORMATTED_BRANCH"
-          if ! git ls-remote --exit-code "$REMOTE_URL" "refs/heads/${FORMATTED_BRANCH}" > /dev/null 2>&1; then
-            echo "❌ Branch not found: $FORMATTED_BRANCH"
-            exit 0
-          fi
+          # echo "Checking if remote branch exists: $FORMATTED_BRANCH"
+          # if ! git ls-remote --exit-code "$REMOTE_URL" "refs/heads/${FORMATTED_BRANCH}" > /dev/null 2>&1; then
+          #   echo "❌ Branch not found: $FORMATTED_BRANCH"
+          #   exit 0
+          # fi
       
-          if [ ! -d .repo ]; then
-            echo "Initializing repo with branch $FORMATTED_BRANCH"
-            repo init --depth=1 --partial-clone --clone-filter=blob:none \
-              --no-clone-bundle --no-tags \
-              -u https://android.googlesource.com/kernel/manifest \
-              -b common-${FORMATTED_BRANCH} --repo-rev=stable
-          else
-            echo "Using existing .repo cache"
-          fi
+          # if [ ! -d .repo ]; then
+          #   echo "Initializing repo with branch $FORMATTED_BRANCH"
+          #   repo init --depth=1 --partial-clone --clone-filter=blob:none \
+          #     --no-clone-bundle --no-tags \
+          #     -u https://android.googlesource.com/kernel/manifest \
+          #     -b common-${FORMATTED_BRANCH} --repo-rev=stable
+          # else
+          #   echo "Using existing .repo cache"
+          # fi
       
-          # Check if deprecated branch should be used
-          if git ls-remote "$REMOTE_URL" "refs/heads/deprecated/${FORMATTED_BRANCH}" | grep -q "deprecated"; then
-            DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-            echo "Switching to deprecated/${FORMATTED_BRANCH} in manifest"
-            sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
-          fi
+          # # Check if deprecated branch should be used
+          # if git ls-remote "$REMOTE_URL" "refs/heads/deprecated/${FORMATTED_BRANCH}" | grep -q "deprecated"; then
+          #   DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+          #   echo "Switching to deprecated/${FORMATTED_BRANCH} in manifest"
+          #   sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
+          # fi
 
-          # repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.56.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          echo "Syncing repo..."
+          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.56.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
-          # rm -rf gcc
-          # git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
-          # ls prebuilts/gcc/bin
+          rm -rf gcc
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
+          ls prebuilts/gcc/bin
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -222,9 +221,7 @@ jobs:
             SUBLEVEL=$(grep '^SUBLEVEL' "./common/Makefile" | cut -d '=' -f2 | xargs)
             echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
           fi
-
-          cd prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8
-          ls -la
+          
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
           # Clone repositories
