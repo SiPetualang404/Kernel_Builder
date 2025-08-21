@@ -211,18 +211,7 @@ jobs:
           
           rm -rf prebuilts/gcc
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
-          #git clone https://gitlab.com/RainyXeon/clang-r563880.git prebuilts/clang/host/linux-x86/clang-r563880
-          
-          echo "正在克隆llvm-Clang20工具链..." &&
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379 &&
-          aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip -o clang.zip &&
-          unzip -q clang.zip -d prebuilts/clang/host/linux-x86/clang-r547379 &&
-          rm -rf clang.zip &
-          
-          echo "正在克隆构建工具..." &&
-          aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip -o build-tools.zip &&
-          unzip -q build-tools.zip &&
-          rm -rf build-tools.zip &
+          git clone https://gitlab.com/RainyXeon/clang-r530567.git prebuilts/clang/host/linux-x86/clang-r530567
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -563,14 +552,13 @@ jobs:
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
    
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
-            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r547379/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r530567/bin:$PATH"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/gcc/bin:$PATH"
-            #export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
-            export PATH="$GITHUB_WORKSPACE/kernel_workspace/build-tools/bin:$PATH"
 
-            # echo "--- Clang Version ---"
-            # clang --version
+            echo "--- Clang Version ---"
+            clang --version
             echo "--- GCC Version ---"
             aarch64-buildroot-linux-gnu-gcc -v
             
