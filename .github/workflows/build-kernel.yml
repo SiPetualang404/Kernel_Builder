@@ -569,8 +569,8 @@ jobs:
             export PATH="/usr/lib/ccache:$PATH"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/build-tools/bin:$PATH"
 
-            echo "--- Clang Version ---"
-            clang --version
+            # echo "--- Clang Version ---"
+            # clang --version
             echo "--- GCC Version ---"
             aarch64-buildroot-linux-gnu-gcc -v
             
