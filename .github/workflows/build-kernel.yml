@@ -547,19 +547,19 @@ jobs:
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./build.config.gki.aarch64
             sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./build.config.gki.aarch64
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
+   
+            export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/gcc/bin:$PATH"
+            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+            #export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
+            export PATH="/usr/lib/ccache:$PATH"
 
             echo "--- Clang Version ---"
             clang --version
             echo "--- GCC Version ---"
             aarch64-linux-gnu-gcc -v
-                
-            export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/gcc/bin:$PATH"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
-            export PATH="/usr/lib/ccache:$PATH"
-
+            
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
 
@@ -581,23 +581,6 @@ jobs:
           ZIP_NAME="AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.SERIES }}.${{ env.SUBLEVEL }}.zip"
           cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
-
-      # - name: 🛠️ Build Boot Image
-      #   run: |
-      #     cd kernel_workspace/common/out/arch/arm64/boot
-          
-      #     echo "Building boot.img"
-      #     BOOT_NAME="Boot_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.SERIES }}.${{ env.SUBLEVEL }}.img"
-      #     $MKBOOTIMG --header_version 4 --kernel Image --output $BOOT_NAME
-      #     $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image $BOOT_NAME --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-      #     mv ./$BOOT_NAME "${GITHUB_WORKSPACE}/"
-
-      # - name: 📤 Upload Boot Image
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Boot_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.SERIES }}.${{ env.SUBLEVEL }}
-      #     path: |
-      #       *.img
             
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
