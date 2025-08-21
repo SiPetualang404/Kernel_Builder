@@ -160,13 +160,13 @@ jobs:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}
           
-      - name: Install Repo
-        run: |
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
-          chmod a+rx ~/repo
-          sudo mv ~/repo /usr/local/bin/repo
-          echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
-          mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
+      # - name: Install Repo
+      #   run: |
+      #     curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
+      #     chmod a+rx ~/repo
+      #     sudo mv ~/repo /usr/local/bin/repo
+      #     echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+      #     mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
       
       - name: Initialize repo and sync
         shell: bash
