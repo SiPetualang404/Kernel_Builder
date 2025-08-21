@@ -209,8 +209,8 @@ jobs:
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.56.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
 
-          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
-          # git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git gcc
+          #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git gcc
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -557,7 +557,7 @@ jobs:
             echo "--- Clang Version ---"
             clang --version
             echo "--- GCC Version ---"
-            aarch64-linux-gnu-gcc -v
+            aarch64-buildroot-linux-gnu-gcc -v
             
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
             make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make failed"; exit 1; }
