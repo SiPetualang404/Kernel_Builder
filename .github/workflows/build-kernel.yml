@@ -35,7 +35,7 @@ on:
         type: choice
         options:
           - '6.6.56'
-          - '6.6.xx'
+          - '6.6.30'
         default: '6.6.56'
       use_bbr:
         description: 'Enables the BBR Algorithm'
@@ -74,16 +74,6 @@ jobs:
           elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
             BRANCH_NAME="SukiSU"
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          fi
-
-          SERIES="6.6"
-          echo "SERIES=$SERIES" >> $GITHUB_ENV
-          if [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
-            OS_PATCH="2024-11"
-            echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
-          elif [ "${{ inputs.kernel_version }}" = "6.6.xx" ]; then
-            OS_PATCH="lts"
-            echo "OS_PATCH=$OS_PATCH" >> $GITHUB_ENV
           fi
           
       - name: Maximize Build Space
@@ -144,7 +134,7 @@ jobs:
           sudo rm -rf /var/lib/man-db/auto-update
           sudo apt update
           sudo apt-get install -y --no-install-recommends \
-            ccache python3 git curl build-essential libssl-dev bison flex libelf-dev aria2
+            ccache python3 git curl build-essential libssl-dev bison flex libelf-dev
           
       - name: Set ccache
         run: |
@@ -181,34 +171,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p kernel_workspace && cd kernel_workspace
-          
-          # FORMATTED_BRANCH="${{ inputs.android_version }}-${{ env.SERIES }}-${{ env.OS_PATCH }}"
-          # REMOTE_URL="https://android.googlesource.com/kernel/common"
-      
-          # echo "Checking if remote branch exists: $FORMATTED_BRANCH"
-          # if ! git ls-remote --exit-code "$REMOTE_URL" "refs/heads/${FORMATTED_BRANCH}" > /dev/null 2>&1; then
-          #   echo "❌ Branch not found: $FORMATTED_BRANCH"
-          #   exit 0
-          # fi
-      
-          # if [ ! -d .repo ]; then
-          #   echo "Initializing repo with branch $FORMATTED_BRANCH"
-          #   repo init --depth=1 --partial-clone --clone-filter=blob:none \
-          #     --no-clone-bundle --no-tags \
-          #     -u https://android.googlesource.com/kernel/manifest \
-          #     -b common-${FORMATTED_BRANCH} --repo-rev=stable
-          # else
-          #   echo "Using existing .repo cache"
-          # fi
-      
-          # # Check if deprecated branch should be used
-          # if git ls-remote "$REMOTE_URL" "refs/heads/deprecated/${FORMATTED_BRANCH}" | grep -q "deprecated"; then
-          #   DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-          #   echo "Switching to deprecated/${FORMATTED_BRANCH} in manifest"
-          #   sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" "$DEFAULT_MANIFEST_PATH"
-          # fi
-          
-          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.56.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+
+          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "${{ inputs.android_version }}" -m "${{ inputs.kernel_version }}.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
           
           rm -rf prebuilts/gcc
@@ -219,8 +183,13 @@ jobs:
           rm -rf ./msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
       
           if [ -f "./common/Makefile" ]; then
-            SUBLEVEL=$(grep '^SUBLEVEL' "./common/Makefile" | cut -d '=' -f2 | xargs)
-            echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
+            VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
+            PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
+            
+            # Combined kernel version
+            echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
           fi
           
       - name: Add KernelSU & Apply SUSFS Patches
@@ -421,7 +390,6 @@ jobs:
           set_config CONFIG_KSU y
           if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
             set_config CONFIG_KSU_SUSFS_SUS_SU n
-            set_config CONFIG_KSU_KPROBES_HOOK n
             set_config CONFIG_KSU_MANUAL_HOOK y
           elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
             MODEKPM=$([ "${{ inputs.use_kpm }}" = "true" ] && echo "KPM" || echo "NoKPM")
@@ -548,11 +516,14 @@ jobs:
             sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./build.config.gki.aarch64
             sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./build.config.gki.aarch64
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
-   
+
+            if [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
+            fi
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/gcc/bin:$PATH"
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
 
             echo "--- Clang Version ---"
@@ -578,27 +549,28 @@ jobs:
       - name: 📦 Make AnyKernel3
         run: |
           cd ./AnyKernel3
-          ZIP_NAME="AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.SERIES }}.${{ env.SUBLEVEL }}.zip"
+          ZIP_NAME="AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.KERNEL_VER }}.zip"
           cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
             
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.SERIES }}.${{ env.SUBLEVEL }}
+          name: AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.KERNEL_VER }}
           path: ./AnyKernel3/*
           
       - name: Package files
         run: |
+          TAG=$(curl -s https://api.github.com/repos/libxzr/HorizonKernelFlasher/releases | jq -r 'map(select(.prerelease == false and .draft == false)) | first | .tag_name')
+          echo "Latest tag is: $TAG"
           echo "Packing files..."
-          ESCAPED_KERNEL_VER=$(echo "${{ inputs.android_version }}-${{ env.SERIES }}.${{ env.SUBLEVEL }}" | sed -e 's/\./\\./g' -e 's/-/\\-/g')
+          ESCAPED_KERNEL_VER=$(echo "${{ env.KERNEL_VER }}" | sed -e 's/\./\\./g' -e 's/-/\\-/g')
           ESCAPED_KSU_VARIANT=$(echo "${{ inputs.kernelsu_variant }} (${{ env.KSUVER }})" | sed -e 's/\./\\./g' -e 's/-/\\-/g' -e 's/(/\\(/g' -e 's/)/\\)/g')
           ESCAPED_SUSFS_VER=$(echo "${{ env.SUSFS_VERSION }}" | sed -e 's/\./\\./g')
           cat > release.txt << EOF
           >KernelVer: $ESCAPED_KERNEL_VER
           >DriverKSU: $ESCAPED_KSU_VARIANT
-          >HookMode: ${{ inputs.hook }} Hook
-          >SUSFS ඞ: $ESCAPED_SUSFS_VER
+          >SUSFS ඞ: $ESCAPED_SUSFS_VER (${{ inputs.hook }} Hook)
           EOF
           
           cat >> release.txt << 'EOF'
@@ -609,7 +581,7 @@ jobs:
           [+] BBR Algorithm + ECN Support
           [+] TMPFS XATTR + POSIX ACL Support```
           ⬇ How To Flash:
-          >Use flashing software, such as [HorizonKernelFlasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/v1.3/app-release.apk) for flashing the kernel \(Give root access to the Application\)
+          >Use flashing software, such as [Horizon Kernel Flasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/$TAG/app-release.apk) for flashing the kernel \(Give root access to the Application\)
           EOF
           
       - name: Upload to telegram
