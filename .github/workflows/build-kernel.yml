@@ -220,6 +220,9 @@ jobs:
             SUBLEVEL=$(grep '^SUBLEVEL' "./common/Makefile" | cut -d '=' -f2 | xargs)
             echo "SUBLEVEL=$SUBLEVEL" >> $GITHUB_ENV
           fi
+
+          cd prebuilts/clang/host/linux-x86
+          ls -la
           
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
