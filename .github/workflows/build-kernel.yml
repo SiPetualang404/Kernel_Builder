@@ -271,7 +271,7 @@ jobs:
             cd ./KernelSU
             KSU_VERSION=$(expr $(git rev-list --count main 2>/dev/null || echo 13000) + 10700)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-            cp "${GITHUB_WORKSPACE}/.github/workflows/setup.sh" ./
+            cp "$GITHUB_WORKSPACE/.github/workflows/setup.sh" ./
             chmod +x setup.sh
             if [ ! -f "kernel/Makefile" ]; then
               echo "kernel/Makefile not found"
@@ -547,10 +547,10 @@ jobs:
             sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./build.config.gki.aarch64
    
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/gcc/bin:$PATH"
-            export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
-            #export PATH="${GITHUB_WORKSPACE}/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/gcc/bin:$PATH"
+            export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+            #export PATH="{GITHUB_WORKSPACE/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
 
             echo "--- Clang Version ---"
