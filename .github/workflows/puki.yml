@@ -4,54 +4,32 @@ permissions:
   actions: write 
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      kernelsu_variant:
-        description: "Select KernelSU"
-        required: true
-        type: choice
-        options:
-          - 'KernelSU-Next'
-          - 'SukiSU-Ultra'
-        default: 'SukiSU-Ultra'
-      hook:
-        type: choice
-        description: "Select Hook"
-        required: true
-        options:
-          - 'Manual'
-          - 'Tracepoint'
-        default: 'Manual'
       android_version:
-        description: "Select Android Version"
         required: true
-        type: choice
-        options:
-          - 'android15'
-        default: 'android15'
+        type: string
       kernel_version:
-        description: "Select Kernel Version"
         required: true
-        type: choice
-        options:
-          - '6.6.56'
-          - '6.6.30'
-        default: '6.6.56'
-      use_bbr:
-        description: 'Enables the BBR Algorithm'
+        type: string
+      sub_level:
         required: true
-        type: boolean
-        default: true
-      use_net:
-        description: 'Enable network optimization features (proxy, IPv6, etc.)'
+        type: string
+      os_patch_level:
         required: true
-        type: boolean
-        default: true
-      # use_kpm:
-      #   description: 'Enables the KPM Patch (may slightly increase power consumption)'
-      #   required: true
-      #   type: boolean
-      #   default: false
+        type: string
+      kernelsu_variant:
+        required: true
+        type: string
+      kernelsu_branch:
+        required: true
+        type: string
+      kernelsu_branch_other:
+        required: false
+        type: string
+      revision:
+        required: false
+        type: string
 
 jobs:
   build-gki:
@@ -79,7 +57,7 @@ jobs:
       - name: Set CONFIG Environment Variable
         run: |
           # Set CONFIG dynamically based on inputs values
-          CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
 
           # Set CONFIG as an environment variable for future steps
           echo "CONFIG=$CONFIG" >> $GITHUB_ENV
@@ -131,20 +109,22 @@ jobs:
 
       - name: Install Repo
         run: |
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
-          chmod a+rx ~/repo
-          sudo mv ~/repo /usr/local/bin/repo
+          mkdir -p ./git-repo
+          echo "Downloading repo tool..."
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
+          chmod a+rx ./git-repo/repo
+          echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
 
-      # - name: Clone AnyKernel3 and Other Dependencies
-      #   run: |
-      #     echo "Cloning AnyKernel3 and other dependencies..."
-      #     ANYKERNEL_BRANCH="gki-2.0"
-      #     SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-      #     echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
-      #     echo "Using branch for SUSFS: $SUSFS_BRANCH"
-      #     git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-      #     git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-      #     git clone https://github.com/WildPlusKernel/kernel_patches.git
+      - name: Clone AnyKernel3 and Other Dependencies
+        run: |
+          echo "Cloning AnyKernel3 and other dependencies..."
+          ANYKERNEL_BRANCH="gki-2.0"
+          SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
+          echo "Using branch for SUSFS: $SUSFS_BRANCH"
+          git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          git clone https://github.com/WildPlusKernel/kernel_patches.git
 
       - name: Initialize and Sync Kernel Source
         run: |
@@ -152,18 +132,18 @@ jobs:
           mkdir -p "$CONFIG"
           cd "$CONFIG"
           echo "Initializing and syncing kernel source..."
-          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
-
-          if [ -f "./common/Makefile" ]; then
-            VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
-            PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
-            SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
-            echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
-            
-            # Combined kernel version
-            echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
-          fi
+          # FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+          # $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
+          # REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+          # DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
+          # if grep -q deprecated <<< $REMOTE_BRANCH; then
+          #   echo "Found deprecated branch: $FORMATTED_BRANCH"
+          #   sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
+          # fi
+          # $REPO --version
+          # $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          $REPO init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+          $REPO sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
 
       - name: Fix Less Then 6.6.50 Builds
         run: |
@@ -176,82 +156,148 @@ jobs:
             fi
           fi
 
-      - name: Add KernelSU & Apply SUSFS Patches
+      - name: Determine the branch for KernelSU
         run: |
-          # Clone repositories
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.android_version }}-${{ env.SERIES }}
-          git clone https://github.com/tukangbecak01/kernel_patches.git
-          git clone https://github.com/tukangbecak01/AnyKernel3.git
-          
+          case "${{ inputs.kernelsu_branch }}" in
+            "Stable")
+              echo "BRANCH=-" >> $GITHUB_ENV
+              ;;
+            "Dev")
+              if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
+                echo "BRANCH=-s main" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
+                echo "BRANCH=-s next" >> $GITHUB_ENV
+              elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
+                echo "BRANCH=-s wild" >> $GITHUB_ENV
+              fi
+              ;;
+            "Other")
+              if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
+                echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
+              else
+                echo "Error: Custom branch not provided for 'Other'" >&2
+                exit 1
+              fi
+              ;;
+          esac
+      
+      - name: Add KernelSU
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
-            echo "Adding KernelSU Next..."
-            curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
-            echo "Adding KernelSU SukiSU..."
-            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-          fi
+      
+          case "${{ inputs.kernelsu_variant }}" in
+            "WILD")
+              echo "Adding Wild KSU..."
+              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
+            "KSU")
+              echo "Adding KernelSU Official..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
+            "NEXT")
+              echo "Adding KernelSU Next..."
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
+            "MKSU")
+              echo "Adding KernelSU MKSU..."
+              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+              ;;
+          esac
+          
+      - name: Apply SUSFS Patches for KernelSU Variants
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+          
+          echo "Applying SUSFS patches..."
           
           # Copy SUSFS patches
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch ./common/
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cd common
+          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+          cd ..
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          cp ../kernel_patches/69_hide_stuff.patch ./common/
           
-          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
-            echo "Applying SUSFS patches for KernelSU Next..."
-            cd ./KernelSU-Next
-            
-            # Copy KernelSU-Next patches
-            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            cp ../../kernel_patches/next/apk_sign.patch ./
-            cp ../../kernel_patches/next/core_hook.patch ./
-            cp ../../kernel_patches/next/selinux.patch ./
-            cp ../../kernel_patches/next/ksud.patch ./
-            cp ../../kernel_patches/next/rules.patch ./
-            cp ../../kernel_patches/next/sucompat.patch ./
-            cp ../../kernel_patches/next/kernel_compat.patch ./
-            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
-            patch -p1 --forward --fuzz=3 < apk_sign.patch
-            patch -p1 --forward --fuzz=3 < core_hook.patch
-            patch -p1 --forward --fuzz=3 < selinux.patch
-            patch -p1 --forward --fuzz=3 < ksud.patch
-            patch -p1 --forward --fuzz=3 < rules.patch
-            patch -p1 --forward --fuzz=3 < sucompat.patch
-            patch -p1 --forward --fuzz=3 < kernel_compat.patch
-            
-            KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" 10200)
-            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
-            echo "Applying SUSFS patches for SukiSU..."
-            cd ./KernelSU
-            KSU_VERSION=$(expr $(git rev-list --count main 2>/dev/null || echo 13000) + 10700)
-            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-            # cp "$GITHUB_WORKSPACE/.github/workflows/setup.sh" ./
-            # chmod +x setup.sh
-            # if [ ! -f "kernel/Makefile" ]; then
-            #   echo "kernel/Makefile not found"
-            #   ls -la
-            #   exit 1
-            # fi
-            # ./setup.sh
-          else
-            echo "Invalid KernelSU variant selected!"
-            exit 1
-          fi
+          case "${{ inputs.kernelsu_variant }}" in
+            "WILD")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./Wild_KSU
+              ;;
+            "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./KernelSU
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch
+              ;;
+            "NEXT")
+              echo "Applying SUSFS patches for KernelSU Next..."
+              cd ./KernelSU-Next
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+              patch -p1 --forward < fix_apk_sign.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
+              patch -p1 --forward < fix_selinux.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
+              patch -p1 --forward < fix_ksud.c.patch
 
-          cd ../common
-          SUSFS_VERSION=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
-          echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
-          patch -p1 --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
-          patch -p1 -F 3 < 69_hide_stuff.patch
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+              patch -p1 --forward < fix_rules.c.patch
+
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+              patch -p1 --forward < fix_sucompat.c.patch
+
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+              patch -p1 --forward < fix_kernel_compat.c.patch
+              ;;
+            "MKSU")
+              echo "Applying SUSFS patches for MKSU..."
+              cd ./KernelS
+              ;;
+          esac
+
+      - name: Getting KernelSU Version
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+          
+          case "${{ inputs.kernelsu_variant }}" in
+            "WILD")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./Wild_KSU
+              BASE_VERSION=10200
+              ;;
+            "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./KernelSU
+              BASE_VERSION=10200
+              ;;
+            "NEXT")
+              cd ./KernelSU-Next
+              BASE_VERSION=10200
+              ;;
+            "MKSU")
+              ;;
+          esac
+          
+          cd ./kernel
+          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
       - name: Apply Hooks Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           
-          if [ "${{ inputs.kernelsu_variant }}" == "KernelSU-Next" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
             cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
             patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
@@ -260,6 +306,34 @@ jobs:
             cp ../../kernel_patches/wild/syscall_hooks.patch ./
             patch -p1 --forward -F 3 < syscall_hooks.patch
           fi
+
+      - name: Apply Hide Stuff Patches
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG/common"
+          cp ../../kernel_patches/69_hide_stuff.patch ./
+          patch -p1 --forward -F 3 < 69_hide_stuff.patch
+
+      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
+        if: ${{ ( inputs.kernel_version == '6.6' ) }}
+        run: |
+          echo "[+] Adding Samsung KDP exported symbols to abi_gki_aarch64_galaxy"
+          SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
+          echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
+          echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
+          echo "kdp_usecount_inc" >> $SYMBOL_LIST
+          echo "[+] Adding Samsung KDP exported symbols definition to abi_gki_aarch64.stg"
+          cd $CONFIG/common
+          PATCH="../../kernel_patches/samsung/min_kdp/add-min_kdp-symbols.patch"
+          if patch -p1 --dry-run < $PATCH; then
+            echo "[+] Successfully added Samsung KDP exported symbols definition to abi_gki_aarch64.stg"
+            patch -p1 --no-backup-if-mismatch < $PATCH
+          fi
+          echo "[+] Adding Samsung minimal KDP driver"
+          cd drivers
+          cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
+          echo "obj-y += min_kdp.o" >> Makefile
+
 
       - name: Add Configuration Settings
         run: |
@@ -270,7 +344,7 @@ jobs:
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-          if [ "${{ inputs.kernelsu_variant }}" == "KernelSU-Next" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
           fi
                     
@@ -316,7 +390,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          if [ "${{ inputs.kernelsu_variant }}" == "KernelSU-Next" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
             echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
           else
             echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -349,6 +423,13 @@ jobs:
           set -e
           set -x
           cd "$CONFIG/common"
+          # echo "Building the kernel..."
+          # if [ -f "build/build.sh" ]; then
+          #   LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
+          # else
+          #   tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
+          # fi
+          # ccache --show-stats
           export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
           export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
@@ -357,7 +438,6 @@ jobs:
 
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
-
 
       - name: 📦 Make AnyKernel3
         run: |
