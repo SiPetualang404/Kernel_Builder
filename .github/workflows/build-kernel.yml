@@ -595,7 +595,7 @@ jobs:
           [+] BBR Algorithm + ECN Support
           [+] TMPFS XATTR + POSIX ACL Support```
           ⬇ How To Flash:
-          >Use flashing software, such as [Horizon Kernel Flasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/$TAG/app-release.apk) for flashing the kernel \(Give root access to the Application\)
+          >Use flashing software, such as [Horizon Kernel Flasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/v1.3/app-release.apk) for flashing the kernel \(Give root access to the Application\)
           EOF
           
       - name: Upload to telegram
