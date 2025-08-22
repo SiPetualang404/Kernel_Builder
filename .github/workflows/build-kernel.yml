@@ -56,7 +56,7 @@ on:
 jobs:
   build-kernel-kernelsu-susfs:
     name: build-kernel-${{ inputs.android_version }}-${{ inputs.kernel_version }}-[${{ inputs.kernelsu_variant }}]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
