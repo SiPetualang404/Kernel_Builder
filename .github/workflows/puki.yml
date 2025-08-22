@@ -50,6 +50,19 @@ jobs:
       CCACHE_HARDLINK: "true"
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # - name: Set env from choices
+      #   run: |
+      #     if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+      #       BRANCH_NAME="NEXT"
+      #       echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+      #     elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+      #       BRANCH_NAME="SukiSU"
+      #       echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+      #     fi
+          
       - name: Maximize Build Space
         shell: bash
         run: |
@@ -124,38 +137,11 @@ jobs:
           ccache --set-config=compression=true
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
-      - name: Download toolchain
-        run: |
-          AOSP_MIRROR=https://android.googlesource.com
-          BRANCH=main-kernel-build-2024
-          git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
-          git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
-
-      - name: Set environment variables
-        run: |
-          echo "AVBTOOL=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/bin/avbtool" >> $GITHUB_ENV
-          echo "MKBOOTIMG=$GITHUB_WORKSPACE/mkbootimg/mkbootimg.py" >> $GITHUB_ENV
-          echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
-
-      - name: Set boot sign key
-        env:
-          BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
-        run: |
-          if [ ! -z "$BOOT_SIGN_KEY" ]; then
-            echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-          else
-            echo "BOOT_SIGN_KEY is not set. Using AOSP sign key..."
-            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-          fi
-
       - name: Install Repo
         run: |
-          mkdir -p ./git-repo
-          echo "Downloading repo tool..."
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ./git-repo/repo
-          chmod a+rx ./git-repo/repo
-          echo "REPO=$GITHUB_WORKSPACE/./git-repo/repo" >> $GITHUB_ENV
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
+          chmod a+rx ~/repo
+          sudo mv ~/repo /usr/local/bin/repo
 
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
@@ -174,18 +160,8 @@ jobs:
           mkdir -p "$CONFIG"
           cd "$CONFIG"
           echo "Initializing and syncing kernel source..."
-          # FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          # $REPO init --depth=1 --u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
-          # REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
-          # DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
-          # if grep -q deprecated <<< $REMOTE_BRANCH; then
-          #   echo "Found deprecated branch: $FORMATTED_BRANCH"
-          #   sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
-          # fi
-          # $REPO --version
-          # $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-          $REPO init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          $REPO sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
+          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
 
       - name: Fix Less Then 6.6.50 Builds
         run: |
@@ -356,87 +332,200 @@ jobs:
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
-      - name: Fix WiFi and Bluetooth on Samsung 6.6 GKI devices
-        if: ${{ ( inputs.kernel_version == '6.6' ) }}
-        run: |
-          echo "[+] Adding Samsung KDP exported symbols to abi_gki_aarch64_galaxy"
-          SYMBOL_LIST=$CONFIG/common/android/abi_gki_aarch64_galaxy
-          echo "kdp_set_cred_non_rcu" >> $SYMBOL_LIST
-          echo "kdp_usecount_dec_and_test" >> $SYMBOL_LIST
-          echo "kdp_usecount_inc" >> $SYMBOL_LIST
-          echo "[+] Adding Samsung KDP exported symbols definition to abi_gki_aarch64.stg"
-          cd $CONFIG/common
-          PATCH="../../kernel_patches/samsung/min_kdp/add-min_kdp-symbols.patch"
-          if patch -p1 --dry-run < $PATCH; then
-            echo "[+] Successfully added Samsung KDP exported symbols definition to abi_gki_aarch64.stg"
-            patch -p1 --no-backup-if-mismatch < $PATCH
-          fi
-          echo "[+] Adding Samsung minimal KDP driver"
-          cd drivers
-          cp "../../../kernel_patches/samsung/min_kdp/min_kdp.c" min_kdp.c
-          echo "obj-y += min_kdp.o" >> Makefile
-
-
       - name: Add Configuration Settings
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
-          echo "Adding configuration settings to gki_defconfig..."
-
-          # Add KSU configuration settings
-          echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cd $CONFIG
           
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
+          FILE="./common/arch/arm64/configs/gki_defconfig"
+
+          set_config() {
+            KEY="$1"
+            VALUE="$2"
+
+            if grep -q "^$KEY=" "$FILE"; then
+              CURRENT_VALUE=$(grep "^$KEY=" "$FILE" | head -n1 | cut -d '=' -f2)
+              if [ "$CURRENT_VALUE" != "$VALUE" ]; then
+                echo "Updating $KEY from $CURRENT_VALUE to $VALUE"
+                sed -i "s|^$KEY=.*|$KEY=$VALUE|" "$FILE"
+              else
+                echo "$KEY is already set to $VALUE — skipping"
+              fi
+            else
+              echo "Adding $KEY=$VALUE"
+              echo "$KEY=$VALUE" >> "$FILE"
+            fi
+          }
+          
+          # KSU Configuration
+          set_config CONFIG_KSU y
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+            set_config CONFIG_KSU_SUSFS_SUS_SU n
+            set_config CONFIG_KSU_MANUAL_HOOK y
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            MODEKPM=$([ "${{ inputs.use_kpm }}" = "true" ] && echo "KPM" || echo "NoKPM")
+            [ "$MODEKPM" = "KPM" ] && set_config CONFIG_KPM y
+            echo "MODEKPM=$MODEKPM" >> $GITHUB_ENV
+            
+            if [ "${{ inputs.hook }}" = "Manual" ]; then
+              set_config CONFIG_KSU_SUSFS_SUS_SU n
+              set_config CONFIG_KSU_MANUAL_HOOK y
+            elif [ "${{ inputs.hook }}" = "Tracepoint" ]; then
+              set_config CONFIG_KSU_SUSFS_SUS_SU n
+              set_config CONFIG_KSU_TRACEPOINT_HOOK y 
+            fi
           fi
-                    
-          # Add additional tmpfs config setting
-          echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          # Add additional config setting
-          echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
+          # LZ4 1.10.0
+          set_config CONFIG_LZ4V2_COMPRESS y
+          set_config CONFIG_LZ4V2_HC y
+          set_config CONFIG_LZ4V2_DEBUG n
+          
+          # Enable advanced compression support
+          set_config CONFIG_CRYPTO_LZ4 y
+          set_config CONFIG_CRYPTO_LZ4HC y
+          
+          # File system level compression support
+          set_config CONFIG_F2FS_FS_COMPRESSION y
+          set_config CONFIG_F2FS_FS_LZ4 y
+          set_config CONFIG_F2FS_FS_LZ4HC y
+          
+          # TMPFS Configuration
+          set_config CONFIG_RCU_TRACE n
+          set_config CONFIG_TMPFS_XATTR y
+          set_config CONFIG_TMPFS_POSIX_ACL y
 
-          # Add BBR Config
-          echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
-          echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
+          # NF Configuration
+          set_config CONFIG_IP_NF_TARGET_TTL y
+          set_config CONFIG_IP6_NF_TARGET_HL y
+          set_config CONFIG_IP6_NF_MATCH_HL y
+          set_config CONFIG_IP_NF_TARGET_ECN y
+          
+          # ECN Configuration
+          set_config CONFIG_IP_ECN y
+          set_config CONFIG_TCP_ECN y
+          set_config CONFIG_IPV6_ECN y
+          
+          # SUSFS Configuration
+          set_config CONFIG_KSU_SUSFS y
+          set_config CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT y
+          set_config CONFIG_KSU_SUSFS_SUS_PATH y
+          set_config CONFIG_KSU_SUSFS_SUS_MOUNT y
+          set_config CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT y
+          set_config CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT y
+          set_config CONFIG_KSU_SUSFS_SUS_KSTAT y
+          set_config CONFIG_KSU_SUSFS_SUS_OVERLAYFS n
+          set_config CONFIG_KSU_SUSFS_TRY_UMOUNT y
+          set_config CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT y
+          set_config CONFIG_KSU_SUSFS_SPOOF_UNAME y
+          set_config CONFIG_KSU_SUSFS_ENABLE_LOG y
+          set_config CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS y
+          set_config CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
+          set_config CONFIG_KSU_SUSFS_OPEN_REDIRECT y
 
+          # AutoFDO Configuration (Feedback-Directed Optimization)
+          set_config CONFIG_AUTOFDO_CLANG y
+          
+          if [ "${{ inputs.use_bbr }}" = "true" ]; then
+            # BBR Configuration
+            set_config CONFIG_NET_SCH_FQ y
+            set_config CONFIG_TCP_CONG_ADVANCED y
+            set_config CONFIG_TCP_CONG_BBR y
+            set_config CONFIG_TCP_CONG_BIC n
+            set_config CONFIG_TCP_CONG_WESTWOOD n
+            set_config CONFIG_TCP_CONG_HTCP n
+            set_config CONFIG_DEFAULT_BBR y
+          fi
+
+          if [ "${{ inputs.use_net }}" = "true" ]; then
+            # NET Configuration
+            set_config CONFIG_NETFILTER_XT_MATCH_ADDRTYPE y
+            set_config CONFIG_NETFILTER_XT_SET y
+            set_config CONFIG_IP_SET y
+            set_config CONFIG_IP_SET_MAX 65534
+            set_config CONFIG_IP_SET_BITMAP_IP y
+            set_config CONFIG_IP_SET_BITMAP_IPMAC y
+            set_config CONFIG_IP_SET_BITMAP_PORT y
+            set_config CONFIG_IP_SET_HASH_IP y
+            set_config CONFIG_IP_SET_HASH_IPMARK y
+            set_config CONFIG_IP_SET_HASH_IPPORT y
+            set_config CONFIG_IP_SET_HASH_IPPORTIP y
+            set_config CONFIG_IP_SET_HASH_IPPORTNET y
+            set_config CONFIG_IP_SET_HASH_IPMAC y
+            set_config CONFIG_IP_SET_HASH_MAC y
+            set_config CONFIG_IP_SET_HASH_NETPORTNET y
+            set_config CONFIG_IP_SET_HASH_NET y
+            set_config CONFIG_IP_SET_HASH_NETNET y
+            set_config CONFIG_IP_SET_HASH_NETPORT y
+            set_config CONFIG_IP_SET_HASH_NETIFACE y
+            set_config CONFIG_IP_SET_LIST_SET y
+            set_config CONFIG_IP6_NF_NAT y
+            set_config CONFIG_IP6_NF_IPTABLES y
+            set_config CONFIG_IP6_NF_TARGET_MASQUERADE y
+          fi
+          
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          
+      # - name: Add Configuration Settings
+      #   run: |
+      #     echo "Changing to configuration directory: $CONFIG..."
+      #     cd "$CONFIG"
+      #     echo "Adding configuration settings to gki_defconfig..."
 
-      - name: Add SUSFS Configuration Settings
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
+      #     # Add KSU configuration settings
+      #     echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          
+      #     if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+      #       echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
+      #     fi
+                    
+      #     # Add additional tmpfs config setting
+      #     echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          # Add SUSFS configuration settings
-          echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     # Add additional config setting
+      #     echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
-          else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          fi
+      #     # Add BBR Config
+      #     echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
+      #     echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
+
+      #     # Remove check_defconfig
+      #     sed -i 's/check_defconfig//' ./common/build.config.gki
+
+      # - name: Add SUSFS Configuration Settings
+      #   run: |
+      #     echo "Changing to configuration directory: $CONFIG..."
+      #     cd "$CONFIG"
+
+      #     # Add SUSFS configuration settings
+      #     echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+
+      #     if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+      #       echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+      #     else
+      #       echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+      #     fi
 
       - name: Change Kernel Name
         run: |
@@ -465,13 +554,7 @@ jobs:
           set -e
           set -x
           cd "$CONFIG/common"
-          # echo "Building the kernel..."
-          # if [ -f "build/build.sh" ]; then
-          #   LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
-          # else
-          #   tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast --lto=thin //common:kernel_aarch64_dist || exit 1
-          # fi
-          # ccache --show-stats
+          
           export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
           export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
