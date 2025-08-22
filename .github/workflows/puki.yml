@@ -207,14 +207,14 @@ jobs:
             cd ./KernelSU
             KSU_VERSION=$(expr $(git rev-list --count main 2>/dev/null || echo 13000) + 10700)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-            cp "$GITHUB_WORKSPACE/.github/workflows/setup.sh" ./
-            chmod +x setup.sh
-            if [ ! -f "kernel/Makefile" ]; then
-              echo "kernel/Makefile not found"
-              ls -la
-              exit 1
-            fi
-            ./setup.sh
+            # cp "$GITHUB_WORKSPACE/.github/workflows/setup.sh" ./
+            # chmod +x setup.sh
+            # if [ ! -f "kernel/Makefile" ]; then
+            #   echo "kernel/Makefile not found"
+            #   ls -la
+            #   exit 1
+            # fi
+            # ./setup.sh
           else
             echo "Invalid KernelSU variant selected!"
             exit 1
