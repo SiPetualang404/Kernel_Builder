@@ -64,50 +64,17 @@ jobs:
 
     steps:
       - name: Maximize Build Space
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          echo "Removing unused SDKs and tools..."
-
-          # Remove dotnet (frees ~2 GB)
-          sudo rm -rf /usr/share/dotnet || true
-          
-          # Remove haskell (frees ~5.2 GB)
-          sudo rm -rf /opt/ghc || true
-          sudo rm -rf /usr/local/.ghcup || true
-          
-          # Remove Android SDK (frees ~9 GB)
-          # sudo rm -rf /usr/local/lib/android || true
-          
-          # Remove CodeQL (frees ~5.4 GB)
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-
-          # Removes cached Docker images (frees ~3.2 GB)
-          sudo docker image prune --all --force || true
-
-          # Additional optional cleanup (Chromium, Edge drivers, etc.)
-          sudo rm -rf /usr/local/share/powershell || true
-          sudo rm -rf /usr/local/share/chromium || true
-          sudo rm -rf /usr/local/share/edge_driver || true
-          sudo rm -rf /usr/local/share/chromedriver || true
-
-          # Clear temp and apt cache
-          sudo rm -rf /tmp/*
-          sudo apt-get clean
-
-          # Optional: clean user cache
-          rm -rf ~/.cache
-
-          echo "Creating 4GB swap file..."
-          sudo swapoff -a
-          sudo rm -f /mnt/swapfile
-          sudo fallocate -l 4G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-
-          echo "Build space and swap maximized."
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: 'true'          # Frees ~2 GB
+          remove-android: 'true'         # Frees ~9 GB
+          remove-haskell: 'true'         # Frees ~5.2 GB
+          remove-codeql: 'true'          # Frees ~5.4 GB
+          remove-docker-images: 'true'   # Frees ~3.2 GB
+          remove-large-packages: 'true'  # Frees ~3.1 GB
+          remove-swapfile: 'true'        # Frees ~4 GB
+          remove-cached-tools: 'false'   # Avoid unless confirmed safe
+          verbose: 'true'                # Enable detailed logging
           
       - name: Set CONFIG Environment Variable
         run: |
