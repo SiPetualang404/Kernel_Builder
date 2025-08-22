@@ -212,13 +212,13 @@ jobs:
             cp ../../kernel_patches/next/sucompat.patch ./
             cp ../../kernel_patches/next/kernel_compat.patch ./
             patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
-            patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
-            patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-            patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
-            patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
-            patch -p1 --forward --fuzz=3 < fix_rules.c.patch
-            patch -p1 --forward --fuzz=3 < fix_sucompat.c.patch
-            patch -p1 --forward --fuzz=3 < fix_kernel_compat.c.patch
+            patch -p1 --forward --fuzz=3 < apk_sign.patch
+            patch -p1 --forward --fuzz=3 < core_hook.patch
+            patch -p1 --forward --fuzz=3 < selinux.patch
+            patch -p1 --forward --fuzz=3 < ksud.patch
+            patch -p1 --forward --fuzz=3 < rules.patch
+            patch -p1 --forward --fuzz=3 < sucompat.patch
+            patch -p1 --forward --fuzz=3 < kernel_compat.patch
             
             KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" 10200)
             echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
