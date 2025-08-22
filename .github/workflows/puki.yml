@@ -567,12 +567,12 @@ jobs:
       - name: 📦 Make AnyKernel3
         run: |
           cd ./AnyKernel3
-          ZIP_NAME="AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.KERNEL_VER }}.zip"
-          cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
+          ZIP_NAME="AnyKernel3_bawel.zip"
+          cp ../$CONFIG/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
             
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.MODEKPM }}_${{ env.KERNEL_VER }}
+          name: AnyKernel3_bawel
           path: ./AnyKernel3/*
