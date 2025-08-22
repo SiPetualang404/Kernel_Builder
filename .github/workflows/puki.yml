@@ -1,4 +1,4 @@
-name: Build Script
+name: GKI Kernel Build
 permissions:
   contents: write
   actions: write 
@@ -108,16 +108,10 @@ jobs:
           sudo swapon /swapfile
 
           echo "Build space and swap maximized."
-          
-      - name: Set CONFIG Environment Variable
+      
+      - name: 📊 Check disk space
         run: |
-          # Set CONFIG dynamically based on inputs values
-          CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-
-          # Set CONFIG as an environment variable for future steps
-          echo "CONFIG=$CONFIG" >> $GITHUB_ENV
-
-          echo "CONFIG set to: $CONFIG"
+          df -h
 
       - name: Install Dependencies
         run: |
@@ -131,12 +125,22 @@ jobs:
 
       - name: Set up ccache
         run: |
-          mkdir -p ~/.cache/bazel
+          # ccache --version
+          # ccache --max-size=2G
+          # ccache --set-config=compression=true
+          # echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
           ccache --version
-          ccache --max-size=2G
+          ccache --max-size=3G
           ccache --set-config=compression=true
-          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+          mkdir -p $HOME/.ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}/bazel
 
+      - name: Restore ccache from cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ inputs.android_version }}-${{ inputs.kernel_version }}
+          
       - name: Install Repo
         run: |
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
@@ -157,15 +161,14 @@ jobs:
       - name: Initialize and Sync Kernel Source
         run: |
           echo "Creating folder for configuration: $CONFIG..."
-          mkdir -p "$CONFIG"
-          cd "$CONFIG"
+          mkdir -p kernel_workspace && cd kernel_workspace
           echo "Initializing and syncing kernel source..."
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
+          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
       - name: Fix Less Then 6.6.50 Builds
         run: |
-          cd "$CONFIG/common"
+          cd kernel_workspace/common
           if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
             if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
@@ -202,7 +205,7 @@ jobs:
       - name: Add KernelSU
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
+          cd "kernel_workspace"
       
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
@@ -226,7 +229,7 @@ jobs:
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
+          cd kernel_workspace
           
           echo "Applying SUSFS patches..."
           
@@ -285,7 +288,7 @@ jobs:
       - name: Getting KernelSU Version
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG"
+          cd kernel_workspace
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
@@ -313,7 +316,7 @@ jobs:
       - name: Apply Hooks Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
+          cd "kernel_workspace/common"
           
           if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
             echo "Applying hooks for KernelSU-Next..."
@@ -328,16 +331,15 @@ jobs:
       - name: Apply Hide Stuff Patches
         run: |
           echo "Changing to configuration directory: $CONFIG..."
-          cd "$CONFIG/common"
+          cd "kernel_workspace/common"
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
       - name: Add Configuration Settings
         run: |
-          cd $CONFIG
+          cd kernel_workspace
           
           FILE="./common/arch/arm64/configs/gki_defconfig"
-
           set_config() {
             KEY="$1"
             VALUE="$2"
@@ -465,71 +467,10 @@ jobs:
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
-          
-      # - name: Add Configuration Settings
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd "$CONFIG"
-      #     echo "Adding configuration settings to gki_defconfig..."
-
-      #     # Add KSU configuration settings
-      #     echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          
-      #     if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-      #       echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
-      #     fi
-                    
-      #     # Add additional tmpfs config setting
-      #     echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/gki_defconfig
-
-      #     # Add additional config setting
-      #     echo "CONFIG_IP_NF_TARGET_TTL=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_IP6_NF_TARGET_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_IP6_NF_MATCH_HL=y" >> ./common/arch/arm64/configs/gki_defconfig
-
-      #     # Add BBR Config
-      #     echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig 
-      #     echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig 
-
-      #     # Remove check_defconfig
-      #     sed -i 's/check_defconfig//' ./common/build.config.gki
-
-      # - name: Add SUSFS Configuration Settings
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd "$CONFIG"
-
-      #     # Add SUSFS configuration settings
-      #     echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
-
-      #     if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-      #       echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
-      #     else
-      #       echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
-      #     fi
 
       - name: Change Kernel Name
         run: |
-          cd "$CONFIG"
+          cd kernel_workspace
           if [ -f "build/build.sh" ]; then
               perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
               perl -0777 -pi -e 's/(.*)(echo "\$res")/$1echo "\$res-Next-v\$KSUVER-SUSFS-v1.5.9-Wild"/s' ./common/scripts/setlocalversion
@@ -553,7 +494,7 @@ jobs:
         run : |
           set -e
           set -x
-          cd "$CONFIG/common"
+          cd kernel_workspace/common
           
           export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
           export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
