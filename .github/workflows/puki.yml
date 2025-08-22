@@ -76,6 +76,16 @@ jobs:
           remove-cached-tools: 'false'   # Avoid unless confirmed safe
           verbose: 'true'                # Enable detailed logging
 
+      - name: Set env from choices
+        run: |
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+            BRANCH_NAME="NEXT"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            BRANCH_NAME="SukiSU"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          fi
+          
       - name: Install Dependencies
         run: |
           sudo apt-mark hold firefox
@@ -124,8 +134,17 @@ jobs:
 
           echo "Initializing and syncing kernel source..."
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
+          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
+          if [ -f "./common/Makefile" ]; then
+            VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
+            PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
+            
+            # Combined kernel version
+            echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
+          fi
       - name: Fix Less Then 6.6.50 Builds
         run: |
           cd "kernel_workspace/common"
