@@ -155,28 +155,16 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
           chmod a+rx ~/repo
           sudo mv ~/repo /usr/local/bin/repo
-          # echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
-          # mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
-
-      # - name: Restore repo cache
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: kernel_workspace/.repo
-      #     key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
-      #     restore-keys: |
-      #       repo-
             
       - name: Initialize repo and sync
-        shell: bash
         run: |
-          set -euo pipefail
           mkdir -p kernel_workspace && cd kernel_workspace
 
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "${{ inputs.android_version }}" -m "${{ inputs.kernel_version }}.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all) --fail-fast
           
-          rm -rf prebuilts/gcc
-          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
+          #rm -rf prebuilts/gcc
+          #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
           
           echo "Cleaning old ABI exports..."
           rm -rf ./common/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -270,11 +258,6 @@ jobs:
           cd ../common
           SUSFS_VERSION=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
           echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
-          
-          # if [ "{{ inputs.kernel_version }}" = "6.6.30" ]; then
-          #   sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch
-          #   sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch
-          # fi
           patch -p1 --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
           patch -p1 -F 3 < 69_hide_stuff.patch
 
