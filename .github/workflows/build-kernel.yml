@@ -192,16 +192,16 @@ jobs:
             echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
           fi
 
-      - name: Fix Less Then 6.6.50 Builds
-        run: |
-          cd "$CONFIG/common"
-          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
-            if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
-              sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
-            else
-              echo "Line already present. Skipping insert."
-            fi
-          fi
+      # - name: Fix Less Then 6.6.50 Builds
+      #   run: |
+      #     cd "$CONFIG/common"
+      #     if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+      #       if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
+      #         sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
+      #       else
+      #         echo "Line already present. Skipping insert."
+      #       fi
+      #     fi
           
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
