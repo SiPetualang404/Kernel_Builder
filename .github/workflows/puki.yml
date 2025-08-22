@@ -18,9 +18,8 @@ on:
         required: true
         type: choice
         options:
-          - '6.6.56'
-          - '6.6.30'
-        default: '6.6.56'
+          - '6.6'
+        default: '6.6'
       kernelsu_variant:
         description: "Selec"
         required: true
