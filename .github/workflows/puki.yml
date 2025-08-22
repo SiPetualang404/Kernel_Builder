@@ -497,10 +497,10 @@ jobs:
           cd kernel_workspace/common
           
           export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
-          export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
-          export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
-          export PATH="$GITHUB_WORKSPACE/$CONFIG/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
-          export PATH="/usr/lib/ccache_${{ inputs.android_version }}-${{ inputs.kernel_version }}:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
+          export PATH="/usr/lib/ccache:$PATH"
 
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
