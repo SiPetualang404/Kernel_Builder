@@ -66,19 +66,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set env from choices
-        run: |
-          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
-            BRANCH_NAME="NEXT"
-            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
-            BRANCH_NAME="SukiSU"
-            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          fi
           
       - name: Maximize Build Space
-        shell: bash
         run: |
           set -euo pipefail
           
@@ -176,16 +165,16 @@ jobs:
           # Combined kernel version
           echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
           
-      - name: Fix Less Then 6.6.50 Builds
-        run: |
-          cd kernel_workspace/common
-          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
-            if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
-                sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
-            else
-                echo "Line already present. Skipping insert."
-            fi
-          fi
+      # - name: Fix Less Then 6.6.50 Builds
+      #   run: |
+      #     cd kernel_workspace/common
+      #     if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
+      #       if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
+      #           sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
+      #       else
+      #           echo "Line already present. Skipping insert."
+      #       fi
+      #     fi
 
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
@@ -536,14 +525,14 @@ jobs:
       - name: 📦 Make AnyKernel3
         run: |
           cd ./AnyKernel3
-          ZIP_NAME="AnyKernel3_${{ env.KERNEL_VER }}_${{ env.BRANCH_NAME }}_${{ env.KSUVER }}.zip"
+          ZIP_NAME="AnyKernel3_${{ env.KERNEL_VER }}_${{ inputs.kernelsu_variant }}_${{ env.KSUVER }}.zip"
           cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
             
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_${{ env.KERNEL_VER }}_${{ env.BRANCH_NAME }}_${{ env.KSUVER }}
+          name: AnyKernel3_${{ env.KERNEL_VER }}_${{ inputs.kernelsu_variant }}_${{ env.KSUVER }}
           path: ./AnyKernel3/*
 
       - name: Package files
