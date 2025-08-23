@@ -66,15 +66,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # - name: Set env from choices
-      #   run: |
-      #     if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
-      #       BRANCH_NAME="NEXT"
-      #       echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-      #     elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
-      #       BRANCH_NAME="SukiSU"
-      #       echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-      #     fi
+      - name: Set env from choices
+        run: |
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+            BRANCH_NAME="NEXT"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            BRANCH_NAME="SukiSU"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          fi
           
       - name: Maximize Build Space
         shell: bash
@@ -185,15 +185,15 @@ jobs:
             fi
           fi
 
-      - name: Clone AnyKernel3 and Other Dependencies
-        run: |
-          echo "Cloning AnyKernel3 and other dependencies..."
-          SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ env.SERIES }}"
-          echo "Using branch for SUSFS: $SUSFS_BRANCH"
-          git clone https://github.com/tukangbecak01/AnyKernel3.git
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          #git clone https://github.com/WildPlusKernel/kernel_patches.git
-          git clone https://github.com/tukangbecak01/kernel_patches.git
+      # - name: Clone AnyKernel3 and Other Dependencies
+      #   run: |
+      #     echo "Cloning AnyKernel3 and other dependencies..."
+      #     SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ env.SERIES }}"
+      #     echo "Using branch for SUSFS: $SUSFS_BRANCH"
+      #     git clone https://github.com/tukangbecak01/AnyKernel3.git
+      #     git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+      #     #git clone https://github.com/WildPlusKernel/kernel_patches.git
+      #     git clone https://github.com/tukangbecak01/kernel_patches.git
 
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
