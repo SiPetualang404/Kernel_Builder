@@ -175,6 +175,16 @@ jobs:
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
+          if [ -f "./common/Makefile" ]; then
+            VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
+            PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+            echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
+            
+            # Combined kernel version
+            echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
+          fi
+
       - name: Fix Less Then 6.6.50 Builds
         run: |
           cd kernel_workspace/common
