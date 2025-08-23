@@ -185,16 +185,6 @@ jobs:
             fi
           fi
 
-      # - name: Clone AnyKernel3 and Other Dependencies
-      #   run: |
-      #     echo "Cloning AnyKernel3 and other dependencies..."
-      #     SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ env.SERIES }}"
-      #     echo "Using branch for SUSFS: $SUSFS_BRANCH"
-      #     git clone https://github.com/tukangbecak01/AnyKernel3.git
-      #     git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-      #     #git clone https://github.com/WildPlusKernel/kernel_patches.git
-      #     git clone https://github.com/tukangbecak01/kernel_patches.git
-
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
           # Clone repositories
@@ -264,62 +254,6 @@ jobs:
           echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
           patch -p1 -F 3 < 69_hide_stuff.patch
-      
-      # - name: Add KernelSU
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd "kernel_workspace"
-      
-      #     case "${{ inputs.kernelsu_variant }}" in
-      #       "KernelSU-Next")
-      #         echo "Adding KernelSU Next..."
-      #         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-      #     esac
-          
-      # - name: Apply SUSFS Patches for KernelSU Variants
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd kernel_workspace
-          
-      #     echo "Applying SUSFS patches..."
-          
-      #     # Copy SUSFS patches
-      #     cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch ./common/
-      #     cd common
-      #     patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch
-      #     cd ..
-      #     cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
-      #     cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          
-      #     case "${{ inputs.kernelsu_variant }}" in
-      #       "KernelSU-Next")
-      #         echo "Applying SUSFS patches for KernelSU Next..."
-      #         cd ./KernelSU-Next
-      #         cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-      #         patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-              
-      #         cp ../../kernel_patches/next/apk_sign.patch ./
-      #         patch -p1 --forward < apk_sign.patch
-              
-      #         cp ../../kernel_patches/next/core_hook.patch ./
-      #         patch -p1 --forward --fuzz=3 < core_hook.patch
-              
-      #         cp ../../kernel_patches/next/selinux.patch ./
-      #         patch -p1 --forward < selinux.patch
-              
-      #         cp ../../kernel_patches/next/ksud.patch ./
-      #         patch -p1 --forward < ksud.patch
-
-      #         cp ../../kernel_patches/next/rules.patch ./
-      #         patch -p1 --forward < rules.patch
-
-      #         cp ../../kernel_patches/next/sucompat.patch ./
-      #         patch -p1 --forward < sucompat.patch
-
-      #         cp ../../kernel_patches/next/kernel_compat.patch ./
-      #         patch -p1 --forward < kernel_compat.patch
-      #         ;;
-      #     esac
           
       - name: Apply Hooks Patches
         run: |
@@ -339,13 +273,6 @@ jobs:
               patch -p1 -F 3 < tracepoint_hooks.patch
             fi
           fi
-
-      # - name: Apply Hide Stuff Patches
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd "kernel_workspace/common"
-      #     cp ../../kernel_patches/69_hide_stuff.patch ./
-      #     patch -p1 --forward -F 3 < 69_hide_stuff.patch
           
       - name: Updated LZ4 to v1.10.0
         run: |
@@ -591,6 +518,18 @@ jobs:
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
           make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
 
+      # - name: 📦 Apply KPM Patch (SukiSU only)
+      #   if: ${{ inputs.use_kpm }}
+      #   run: |
+      #     cd kernel_workspace/common/out/arch/arm64/boot
+      #     TAG=$(curl -s https://api.github.com/repos/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases | jq -r 'map(select(.prerelease == false and .draft == false)) | first | .tag_name')
+      #     echo "Latest tag is: $TAG"
+      #     curl -LSs -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/$TAG/patch_linux"
+      #     chmod +x patch_linux
+      #     ./patch_linux
+      #     rm -f Image
+      #     mv oImage Image
+      
       - name: 📦 Make AnyKernel3
         run: |
           cd ./AnyKernel3
@@ -603,3 +542,39 @@ jobs:
         with:
           name: AnyKernel3_bawel
           path: ./AnyKernel3/*
+
+      - name: Package files
+        run: |
+          echo "Packing files..."
+          ESCAPED_KERNEL_VER=$(echo "${{ env.KERNEL_VER }}" | sed -e 's/\./\\./g' -e 's/-/\\-/g')
+          ESCAPED_KSU_VARIANT=$(echo "${{ inputs.kernelsu_variant }} (${{ env.KSUVER }})" | sed -e 's/\./\\./g' -e 's/-/\\-/g' -e 's/(/\\(/g' -e 's/)/\\)/g')
+          ESCAPED_SUSFS_VER=$(echo "${{ env.SUSFS_VERSION }}" | sed -e 's/\./\\./g')
+          cat > release.txt << EOF
+          >KernelVer: $ESCAPED_KERNEL_VER
+          >DriverKSU: $ESCAPED_KSU_VARIANT
+          >SUSFS ඞ: $ESCAPED_SUSFS_VER (${{ inputs.hook }} Hook)
+          EOF
+          
+          cat >> release.txt << 'EOF'
+          📝 Features:
+          ```
+          [+] LZ4 v1.10.0 (ZRAM)
+          [+] TCP Pacing Tweaks
+          [+] BBR Algorithm + ECN Support
+          [+] TMPFS XATTR + POSIX ACL Support```
+          ⬇ How To Flash:
+          >Use flashing software, such as [Horizon Kernel Flasher](https://github.com/libxzr/HorizonKernelFlasher/releases/download/v1.3/app-release.apk) for flashing the kernel \(Give root access to the Application\)
+          EOF
+          
+      - name: Upload to telegram
+        uses: puernya/tg-bot-upload@v1
+        with:
+          bot-id: ${{ secrets.BOT_ID }}
+          chat-id: ${{ secrets.CHAT_ID }}
+          topic-id: ${{ secrets.TOPIC_ID }} 
+          file-path: |
+                  *.zip
+          caption-path: release.txt
+
+      - name: 📊 Post-build disk check
+        run: df -h
