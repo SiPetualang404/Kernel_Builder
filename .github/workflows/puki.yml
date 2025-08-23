@@ -573,16 +573,19 @@ jobs:
       - name: Change Kernel Name
         run: |
           cd kernel_workspace
-         
+          
           #Remove -maybe-dirty
           perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
-              
-          #Set Kernel Name
-          echo "CONFIG_LOCALVERSION=\"-NEXT-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
+
+          sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
+          sudo sed -i 's/-4k/-android15-8-g7f19c751e334-ab13222567-4k/g' ./common/arch/arm64/configs/gki_defconfig
 
           #Remove Abi Exports and Error
+          sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
           rm -rf ./common/android/abi_gki_protected_exports_*
-          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
+            
+          # rm -rf ./common/android/abi_gki_protected_exports_*
+          # perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
       - name: Build
         run : |
