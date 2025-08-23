@@ -552,7 +552,7 @@ jobs:
           cat > release.txt << EOF
           >KernelVer: $ESCAPED_KERNEL_VER
           >DriverKSU: $ESCAPED_KSU_VARIANT
-          >SUSFS ඞ: $ESCAPED_SUSFS_VER (${{ inputs.hook }} Hook)
+          >SUSFS ඞ: $ESCAPED_SUSFS_VER \(${{ inputs.hook }} Hook\)
           EOF
           
           cat >> release.txt << 'EOF'
