@@ -6,6 +6,22 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      kernelsu_variant:
+        description: "Select KernelSU"
+        required: true
+        type: choice
+        options:
+          - 'KernelSU-Next'
+          - 'SukiSU-Ultra'
+        default: 'SukiSU-Ultra'
+      hook:
+        type: choice
+        description: "Select Hook"
+        required: true
+        options:
+          - 'Manual'
+          - 'Tracepoint'
+        default: 'Manual'
       android_version:
         description: "Select Android Version"
         required: true
@@ -18,36 +34,9 @@ on:
         required: true
         type: choice
         options:
-          - '6.6'
-        default: '6.6'
-      kernelsu_variant:
-        description: "Selec"
-        required: true
-        type: choice
-        options:
-          - 'NEXT'
-        default: 'NEXT'
-      kernelsu_branch:
-        description: "Selec"
-        required: true
-        type: choice
-        options:
-          - 'Dev'
-        default: 'Dev'
-      kernelsu_branch_other:
-        description: "If 'Other' is selected, specify your custom branch"
-        required: false
-        type: string
-        default: ""
-      hook:
-        type: choice
-        description: "Select Hook"
-        required: true
-        options:
-          - 'Manual'
-          - 'Tracepoint'
-        default: 'Manual'
-      
+          - '6.6.56'
+          - '6.6.30'
+        default: '6.6.56'
       use_bbr:
         description: 'Enables the BBR Algorithm'
         required: true
@@ -167,16 +156,16 @@ jobs:
           chmod a+rx ~/repo
           sudo mv ~/repo /usr/local/bin/repo
 
-      - name: Clone AnyKernel3 and Other Dependencies
-        run: |
-          echo "Cloning AnyKernel3 and other dependencies..."
-          ANYKERNEL_BRANCH="gki-2.0"
-          SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
-          echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
-          echo "Using branch for SUSFS: $SUSFS_BRANCH"
-          git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          git clone https://github.com/WildPlusKernel/kernel_patches.git
+      # - name: Clone AnyKernel3 and Other Dependencies
+      #   run: |
+      #     echo "Cloning AnyKernel3 and other dependencies..."
+      #     ANYKERNEL_BRANCH="gki-2.0"
+      #     SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+      #     echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
+      #     echo "Using branch for SUSFS: $SUSFS_BRANCH"
+      #     git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+      #     git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+      #     git clone https://github.com/WildPlusKernel/kernel_patches.git
 
       - name: Initialize and Sync Kernel Source
         run: |
@@ -197,163 +186,202 @@ jobs:
             fi
           fi
 
-      - name: Determine the branch for KernelSU
+      - name: Add KernelSU & Apply SUSFS Patches
         run: |
-          case "${{ inputs.kernelsu_branch }}" in
-            "Stable")
-              echo "BRANCH=-" >> $GITHUB_ENV
-              ;;
-            "Dev")
-              if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
-                echo "BRANCH=-s main" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
-                echo "BRANCH=-s next" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
-                echo "BRANCH=-s wild" >> $GITHUB_ENV
-              fi
-              ;;
-            "Other")
-              if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
-                echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
-              else
-                echo "Error: Custom branch not provided for 'Other'" >&2
-                exit 1
-              fi
-              ;;
-          esac
-      
-      - name: Add KernelSU
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "kernel_workspace"
-      
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Adding Wild KSU..."
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "KSU")
-              echo "Adding KernelSU Official..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "NEXT")
-              echo "Adding KernelSU Next..."
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "MKSU")
-              echo "Adding KernelSU MKSU..."
-              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-          esac
+          # Clone repositories
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.android_version }}-${{ env.SERIES }}
+          git clone https://github.com/tukangbecak01/kernel_patches.git
+          git clone https://github.com/tukangbecak01/AnyKernel3.git
           
-      - name: Apply SUSFS Patches for KernelSU Variants
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
           cd kernel_workspace
-          
-          echo "Applying SUSFS patches..."
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+            echo "Adding KernelSU Next..."
+            curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            echo "Adding KernelSU SukiSU..."
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+          fi
           
           # Copy SUSFS patches
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
-          cd common
-          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
-          cd ..
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          cp ../kernel_patches/69_hide_stuff.patch ./common/
           
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./Wild_KSU
-              ;;
-            "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./KernelSU
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch
-              ;;
-            "NEXT")
-              echo "Applying SUSFS patches for KernelSU Next..."
-              cd ./KernelSU-Next
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-              
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
-              patch -p1 --forward < fix_apk_sign.c.patch
-              
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
-              patch -p1 --forward < fix_selinux.c.patch
-              
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
-              patch -p1 --forward < fix_ksud.c.patch
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
+            echo "Applying SUSFS patches for KernelSU Next..."
+            cd ./KernelSU-Next
+            
+            # Copy KernelSU-Next patches
+            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+            cp ../../kernel_patches/next/apk_sign.patch ./
+            cp ../../kernel_patches/next/core_hook.patch ./
+            cp ../../kernel_patches/next/selinux.patch ./
+            cp ../../kernel_patches/next/ksud.patch ./
+            cp ../../kernel_patches/next/rules.patch ./
+            cp ../../kernel_patches/next/sucompat.patch ./
+            cp ../../kernel_patches/next/kernel_compat.patch ./
+            patch -p1 --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
+            patch -p1 --fuzz=3 < fix_apk_sign.c.patch
+            patch -p1 --fuzz=3 < fix_core_hook.c.patch
+            patch -p1 --fuzz=3 < fix_selinux.c.patch
+            patch -p1 --fuzz=3 < fix_ksud.c.patch
+            patch -p1 --fuzz=3 < fix_rules.c.patch
+            patch -p1 --fuzz=3 < fix_sucompat.c.patch
+            patch -p1 --fuzz=3 < fix_kernel_compat.c.patch
+            
+            KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" 10200)
+            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            echo "Applying SUSFS patches for SukiSU..."
+            cd ./KernelSU
+            KSU_VERSION=$(expr $(git rev-list --count main 2>/dev/null || echo 13000) + 10700)
+            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+            cp "$GITHUB_WORKSPACE/.github/workflows/setup.sh" ./
+            chmod +x setup.sh
+            if [ ! -f "kernel/Makefile" ]; then
+              echo "kernel/Makefile not found"
+              ls -la
+              exit 1
+            fi
+            ./setup.sh
+          else
+            echo "Invalid KernelSU variant selected!"
+            exit 1
+          fi
 
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
-              patch -p1 --forward < fix_rules.c.patch
-
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
-
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch
-              ;;
-            "MKSU")
-              echo "Applying SUSFS patches for MKSU..."
-              cd ./KernelS
-              ;;
-          esac
-
-      - name: Getting KernelSU Version
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd kernel_workspace
+          cd ../common
+          SUSFS_VERSION=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
+          echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
+          patch -p1 --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
+          patch -p1 -F 3 < 69_hide_stuff.patch
           
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./Wild_KSU
-              BASE_VERSION=10200
-              ;;
-            "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./KernelSU
-              BASE_VERSION=10200
-              ;;
-            "NEXT")
-              cd ./KernelSU-Next
-              BASE_VERSION=10200
-              ;;
-            "MKSU")
-              ;;
-          esac
+      # - name: Determine the branch for KernelSU
+      #   run: |
+      #     case "${{ inputs.kernelsu_branch }}" in
+      #       "Stable")
+      #         echo "BRANCH=-" >> $GITHUB_ENV
+      #         ;;
+      #       "Dev")
+      #         if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
+      #           echo "BRANCH=-s main" >> $GITHUB_ENV
+      #         elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
+      #           echo "BRANCH=-s next" >> $GITHUB_ENV
+      #         elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
+      #           echo "BRANCH=-s wild" >> $GITHUB_ENV
+      #         fi
+      #         ;;
+      #       "Other")
+      #         if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
+      #           echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
+      #         else
+      #           echo "Error: Custom branch not provided for 'Other'" >&2
+      #           exit 1
+      #         fi
+      #         ;;
+      #     esac
+      
+      # - name: Add KernelSU
+      #   run: |
+      #     echo "Changing to configuration directory: $CONFIG..."
+      #     cd "kernel_workspace"
+      
+      #     case "${{ inputs.kernelsu_variant }}" in
+      #       "WILD")
+      #         echo "Adding Wild KSU..."
+      #         curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
+      #         ;;
+      #       "KSU")
+      #         echo "Adding KernelSU Official..."
+      #         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+      #         ;;
+      #       "NEXT")
+      #         echo "Adding KernelSU Next..."
+      #         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
+      #         ;;
+      #       "MKSU")
+      #         echo "Adding KernelSU MKSU..."
+      #         curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
+      #         ;;
+      #     esac
           
-          cd ./kernel
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+      # - name: Apply SUSFS Patches for KernelSU Variants
+      #   run: |
+      #     echo "Changing to configuration directory: $CONFIG..."
+      #     cd kernel_workspace
+          
+      #     echo "Applying SUSFS patches..."
+          
+      #     # Copy SUSFS patches
+      #     cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+      #     cd common
+      #     patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+      #     cd ..
+      #     cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+      #     cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          
+      #     case "${{ inputs.kernelsu_variant }}" in
+      #       "WILD")
+      #         echo "Applying SUSFS patches for Official KernelSU..."
+      #         cd ./Wild_KSU
+      #         ;;
+      #       "KSU")
+      #         echo "Applying SUSFS patches for Official KernelSU..."
+      #         cd ./KernelSU
+      #         cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+      #         patch -p1 --forward < 10_enable_susfs_for_ksu.patch
+      #         ;;
+      #       "NEXT")
+      #         echo "Applying SUSFS patches for KernelSU Next..."
+      #         cd ./KernelSU-Next
+      #         cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+      #         patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+              
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+      #         patch -p1 --forward < fix_apk_sign.c.patch
+              
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+      #         patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
+      #         patch -p1 --forward < fix_selinux.c.patch
+              
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
+      #         patch -p1 --forward < fix_ksud.c.patch
+
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
+      #         patch -p1 --forward < fix_rules.c.patch
+
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
+      #         patch -p1 --forward < fix_sucompat.c.patch
+
+      #         cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
+      #         patch -p1 --forward < fix_kernel_compat.c.patch
+      #         ;;
+      #       "MKSU")
+      #         echo "Applying SUSFS patches for MKSU..."
+      #         cd ./KernelS
+      #         ;;
+      #     esac
           
       - name: Apply Hooks Patches
         run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "kernel_workspace/common"
-          
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
+          cd kernel_workspace/common
+
+          if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
             echo "Applying hooks for KernelSU-Next..."
             cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
-            patch -p1 --forward -F 3 < scope_min_manual_hooks_v1.4.patch
-          elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "Applying hooks for Wild KSU..."
-            cp ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 --forward -F 3 < syscall_hooks.patch
+            patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
+          elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
+            echo "Applying hooks for SukiSU..."
+            if [ "${{ inputs.hook }}" = "Manual" ]; then
+              cp ../../kernel_patches/sukisu/syscall_hooks.patch ./
+              patch -p1 -F 3 < syscall_hooks.patch
+            elif [ "${{ inputs.hook }}" = "Tracepoint" ]; then
+              cp ../../kernel_patches/sukisu/tracepoint_hooks.patch ./
+              patch -p1 -F 3 < tracepoint_hooks.patch
+            fi
           fi
-
-      - name: Apply Hide Stuff Patches
-        run: |
-          echo "Changing to configuration directory: $CONFIG..."
-          cd "kernel_workspace/common"
-          cp ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
       - name: Updated LZ4 to v1.10.0
         run: |
@@ -584,9 +612,6 @@ jobs:
           sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
           rm -rf ./common/android/abi_gki_protected_exports_*
             
-          # rm -rf ./common/android/abi_gki_protected_exports_*
-          # perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-
       - name: Build
         run : |
           set -e
