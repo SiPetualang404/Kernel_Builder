@@ -18,8 +18,9 @@ on:
         required: true
         type: choice
         options:
-          - '6.6'
-        default: '6.6'
+          - '6.6.56'
+          - '6.6.30'
+        default: '6.6.56'
       kernelsu_variant:
         description: "Selec"
         required: true
@@ -39,6 +40,30 @@ on:
         required: false
         type: string
         default: ""
+      hook:
+        type: choice
+        description: "Select Hook"
+        required: true
+        options:
+          - 'Manual'
+          - 'Tracepoint'
+        default: 'Manual'
+      
+      use_bbr:
+        description: 'Enables the BBR Algorithm'
+        required: true
+        type: boolean
+        default: true
+      use_net:
+        description: 'Enable network optimization features (proxy, IPv6, etc.)'
+        required: true
+        type: boolean
+        default: true
+      # use_kpm:
+      #   description: 'Enables the KPM Patch (may slightly increase power consumption)'
+      #   required: true
+      #   type: boolean
+      #   default: false
 
 jobs:
   build-gki:
@@ -125,10 +150,6 @@ jobs:
 
       - name: Set up ccache
         run: |
-          # ccache --version
-          # ccache --max-size=2G
-          # ccache --set-config=compression=true
-          # echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
           ccache --version
           ccache --max-size=3G
           ccache --set-config=compression=true
@@ -335,11 +356,93 @@ jobs:
           cp ../../kernel_patches/69_hide_stuff.patch ./
           patch -p1 --forward -F 3 < 69_hide_stuff.patch
 
+      - name: Updated LZ4 to v1.10.0
+        run: |
+          LZ4_VERSION="1.10.0"
+          LZ4_DOWNLOAD_URL="https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz"
+          cd kernel_workspace/common
+          mkdir -p lz4_temp && cd lz4_temp
+          echo "Download LZ4 ${LZ4_VERSION} source code..."
+          curl -Ls "${LZ4_DOWNLOAD_URL}" -o lz4.tar.gz
+          tar -zxf lz4.tar.gz --strip-components=1
+
+          # Copy the files and use independent names to avoid conflicts with LZ4K
+          echo "Copy the LZ4 file to the kernel directory..."
+          # Source code file (add "lz4v2_" prefix)
+          cp lib/lz4.c ../lib/lz4v2_core.c
+          cp lib/lz4.h ../lib/lz4v2_core.h
+          cp lib/lz4hc.c ../lib/lz4v2_hc.c
+          cp lib/lz4hc.h ../lib/lz4v2_hc.h
+          # Header file (put in a separate path）
+          mkdir -p ../include/linux/lz4v2
+          cp lib/lz4.h ../include/linux/lz4v2/lz4.h
+          cp lib/lz4hc.h ../include/linux/lz4v2/lz4hc.h
+
+          # Globally rename functions and macros (complete namespace isolation)
+          echo "Rename symbols to avoid conflicts..."
+          # Core compression functions renamed
+          sed -i 's/LZ4_compress_default/lz4v2_compress_default/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
+          sed -i 's/LZ4_decompress_safe/lz4v2_decompress_safe/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
+          # HC high compression function rename
+          sed -i 's/LZ4_compress_HC/lz4v2_compress_HC/g' ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
+          # Internal macros and helper functions renamed
+          sed -i 's/LZ4_/LZ4V2_/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
+          
+          # Add kernel compatibility adaptation
+          echo "Add kernel adaptation code..."
+          # Introduce necessary kernel header files
+          sed -i '1i#include <linux/types.h>' ../lib/lz4v2_core.c
+          sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_core.c
+          sed -i '3i#include <linux/module.h>' ../lib/lz4v2_core.c
+          # HC files are processed similarly
+          sed -i '1i#include <linux/types.h>' ../lib/lz4v2_hc.c
+          sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_hc.c
+          sed -i '3i#include <linux/module.h>' ../lib/lz4v2_hc.c
+
+          # Add module declaration (conforming to kernel spec)
+          echo "Add module metadata..."
+          cat >> ../lib/lz4v2_core.c << 'EOF'
+          MODULE_LICENSE("GPL");
+          MODULE_DESCRIPTION("LZ4 1.10.0 Compression (v2)");
+          MODULE_AUTHOR("LZ4 Project");
+          EXPORT_SYMBOL(lz4v2_compress_default);
+          EXPORT_SYMBOL(lz4v2_decompress_safe);
+          EOF
+
+          cat >> ../lib/lz4v2_hc.c << 'EOF'
+          MODULE_LICENSE("GPL");
+          MODULE_DESCRIPTION("LZ4HC 1.10.0 Compression (v2)");
+          MODULE_AUTHOR("LZ4 Project");
+          EXPORT_SYMBOL(lz4v2_compress_HC);
+          EOF
+
+          # Update Makefile to ensure compilation
+          echo "Update Makefile configuration..."
+          if ! grep -q "lz4v2_core.o" ../lib/Makefile; then
+            echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_core.o" >> ../lib/Makefile
+            echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_hc.o" >> ../lib/Makefile
+          fi
+
+          # Clean temporary files
+          cd .. && rm -rf lz4_temp
+          echo "LZ4 ${LZ4_VERSION} integration completed"
+          
+      - name: Apply ECN and TCP Pacing Tweaks
+        run: |
+          set -e
+          TCP_IPV4_PATH="$GITHUB_WORKSPACE/kernel_workspace/common/net/ipv4/tcp_ipv4.c"
+          if [ ! -f "$TCP_IPV4_PATH" ]; then echo "ERROR: $TCP_IPV4_PATH not found!"; exit 1; fi
+          sed -i 's/net->ipv4.sysctl_tcp_ecn = 2;/net->ipv4.sysctl_tcp_ecn = 1;/' "$TCP_IPV4_PATH"
+          sed -i 's/net->ipv4.sysctl_tcp_pacing_ss_ratio = 200;/net->ipv4.sysctl_tcp_pacing_ss_ratio = 150;/' "$TCP_IPV4_PATH"
+          sed -i 's/net->ipv4.sysctl_tcp_pacing_ca_ratio = 120;/net->ipv4.sysctl_tcp_pacing_ca_ratio = 110;/' "$TCP_IPV4_PATH"
+          echo "ECN and TCP Pacing tweaks successfully applied."
+          
       - name: Add Configuration Settings
         run: |
           cd kernel_workspace
           
           FILE="./common/arch/arm64/configs/gki_defconfig"
+
           set_config() {
             KEY="$1"
             VALUE="$2"
@@ -471,24 +574,16 @@ jobs:
       - name: Change Kernel Name
         run: |
           cd kernel_workspace
-          if [ -f "build/build.sh" ]; then
-              perl -pi -e 's/-dirty//' ./common/scripts/setlocalversion
-              perl -0777 -pi -e 's/(.*)(echo "\$res")/$1echo "\$res-Next-v\$KSUVER-SUSFS-v1.5.9-Wild"/s' ./common/scripts/setlocalversion
-              perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
-          else
-              #Remove -maybe-dirty
-              perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+         
+          #Remove -maybe-dirty
+          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
               
-              #Set Kernel Name
-              echo "CONFIG_LOCALVERSION=\"-NEXT-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
+          #Set Kernel Name
+          echo "CONFIG_LOCALVERSION=\"-NEXT-v$KSUVER-SUSFS-v1.5.9-Wild\"" >> ./common/arch/arm64/configs/gki_defconfig
 
-              #Set Kernel Timestamp
-              perl -pi -e 's/build-timestamp = \$\(or \$\(KBUILD_BUILD_TIMESTAMP\), \$\(build-timestamp-auto\)\)/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
-
-              #Remove Abi Exports and Error
-              rm -rf ./common/android/abi_gki_protected_exports_*
-              perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
-          fi
+          #Remove Abi Exports and Error
+          rm -rf ./common/android/abi_gki_protected_exports_*
+          perl -pi -e 's/^\s*"protected_exports_list"\s*:\s*"android\/abi_gki_protected_exports_aarch64",\s*$//;' ./common/BUILD.bazel
 
       - name: Build
         run : |
@@ -509,7 +604,7 @@ jobs:
         run: |
           cd ./AnyKernel3
           ZIP_NAME="AnyKernel3_bawel.zip"
-          cp ../$CONFIG/common/out/arch/arm64/boot/Image ./Image
+          cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
             
       - name: 📤 Upload AnyKernel3
