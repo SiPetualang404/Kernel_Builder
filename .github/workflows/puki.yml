@@ -34,9 +34,9 @@ on:
         required: true
         type: choice
         options:
-          - '6.6.56'
           - '6.6.30'
-        default: '6.6.56'
+          - '6.6.56'
+        default: ''
       use_bbr:
         description: 'Enables the BBR Algorithm'
         required: true
