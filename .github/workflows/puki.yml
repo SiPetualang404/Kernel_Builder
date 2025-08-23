@@ -176,16 +176,18 @@ jobs:
           # Combined kernel version
           echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
 
-      - name: Fix Less Then 6.6.50 Builds
-        run: |
-          cd kernel_workspace/common
-          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
-            if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
-                sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
-            else
-                echo "Line already present. Skipping insert."
-            fi
-          fi
+          ls build/kernel/kleaf/impl
+
+      # - name: Fix Less Then 6.6.50 Builds
+      #   run: |
+      #     cd kernel_workspace/common
+      #     if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
+      #       if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
+      #           sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
+      #       else
+      #           echo "Line already present. Skipping insert."
+      #       fi
+      #     fi
 
       - name: Add KernelSU & Apply SUSFS Patches
         run: |
@@ -254,7 +256,11 @@ jobs:
           cd ../common
           SUSFS_VERSION=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
           echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
-          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
+          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-android15-6.6.patch
+            sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-android15-6.6.patch
+          fi
+          #patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
           patch -p1 -F 3 < 69_hide_stuff.patch
           
       - name: Apply Hooks Patches
@@ -496,7 +502,7 @@ jobs:
           cd kernel_workspace
           
           # Remove -maybe-dirty
-          perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
+          sed -i 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
 
           # Set Kernel Name
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
@@ -536,14 +542,14 @@ jobs:
       - name: 📦 Make AnyKernel3
         run: |
           cd ./AnyKernel3
-          ZIP_NAME="AnyKernel3_bawel.zip"
+          ZIP_NAME="AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.KERNEL_VER }}.zip"
           cp ../kernel_workspace/common/out/arch/arm64/boot/Image ./Image
           zip -q -r "../$ZIP_NAME" ./*
             
       - name: 📤 Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_bawel
+          name: AnyKernel3_${{ env.BRANCH_NAME }}_${{ env.KERNEL_VER }}
           path: ./AnyKernel3/*
 
       - name: Package files
