@@ -1,4 +1,4 @@
-name: GKI Kernel Buildjkskf
+name: GKI Kernel Build
 permissions:
   contents: write
   actions: write 
@@ -54,9 +54,10 @@ on:
       #   default: false
 
 jobs:
-  build-gki:
+ build-kernel-kernelsu-susfs:
+    name: build-kernel-${{ inputs.android_version }}-${{ inputs.kernel_version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 40
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
@@ -158,21 +159,22 @@ jobs:
 
       - name: Initialize and Sync Kernel Source
         run: |
-          echo "Creating folder for configuration: $CONFIG..."
           mkdir -p kernel_workspace && cd kernel_workspace
+          
           echo "Initializing and syncing kernel source..."
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
           repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
 
-          if [ -f "./common/Makefile" ]; then
-            VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
-            PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
-            SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
-            echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
+          #rm -rf prebuilts/gcc
+          #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
+          
+          VERSION=$(grep '^VERSION' ./common/Makefile | cut -d '=' -f2 | xargs)
+          PATCHLEVEL=$(grep '^PATCHLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+          SUBLEVEL=$(grep '^SUBLEVEL' ./common/Makefile | cut -d '=' -f2 | xargs)
+          echo "SERIES=${VERSION}.${PATCHLEVEL}" >> $GITHUB_ENV
             
-            # Combined kernel version
-            echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
-          fi
+          # Combined kernel version
+          echo "KERNEL_VER=${VERSION}.${PATCHLEVEL}.${SUBLEVEL}" >> $GITHUB_ENV
 
       - name: Fix Less Then 6.6.50 Builds
         run: |
@@ -493,13 +495,14 @@ jobs:
         run: |
           cd kernel_workspace
           
-          #Remove -maybe-dirty
+          # Remove -maybe-dirty
           perl -pi -e 's/-maybe-dirty//g' ./build/kernel/kleaf/impl/stamp.bzl
 
+          # Set Kernel Name
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
           sudo sed -i 's/-4k/-android15-8-g7f19c751e334-ab13222567-4k/g' ./common/arch/arm64/configs/gki_defconfig
 
-          #Remove Abi Exports and Error
+          # Remove Abi Exports and Error
           sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
           rm -rf ./common/android/abi_gki_protected_exports_*
             
