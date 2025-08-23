@@ -1,4 +1,4 @@
-name: GKI Kernel Build
+name: GKI Kernel Buildjkskf
 permissions:
   contents: write
   actions: write 
@@ -188,13 +188,12 @@ jobs:
       - name: Clone AnyKernel3 and Other Dependencies
         run: |
           echo "Cloning AnyKernel3 and other dependencies..."
-          ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ env.SERIES }}"
-          echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
           echo "Using branch for SUSFS: $SUSFS_BRANCH"
-          git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
+          git clone https://github.com/tukangbecak01/AnyKernel3.git
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
-          git clone https://github.com/WildPlusKernel/kernel_patches.git
+          #git clone https://github.com/WildPlusKernel/kernel_patches.git
+          git clone https://github.com/tukangbecak01/kernel_patches.git
 
       # - name: Add KernelSU & Apply SUSFS Patches
       #   run: |
@@ -299,44 +298,28 @@ jobs:
               cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
               patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
               
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
-              patch -p1 --forward < fix_apk_sign.c.patch
+              cp ../../kernel_patches/next/apk_sign.patch ./
+              patch -p1 --forward < apk_sign.patch
               
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              cp ../../kernel_patches/next/core_hook.patch ./
+              patch -p1 --forward --fuzz=3 < core_hook.patch
               
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
-              patch -p1 --forward < fix_selinux.c.patch
+              cp ../../kernel_patches/next/selinux.patch ./
+              patch -p1 --forward < selinux.patch
               
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
-              patch -p1 --forward < fix_ksud.c.patch
+              cp ../../kernel_patches/next/ksud.patch ./
+              patch -p1 --forward < ksud.patch
 
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_rules.c.patch ./
-              patch -p1 --forward < fix_rules.c.patch
+              cp ../../kernel_patches/next/rules.patch ./
+              patch -p1 --forward < rules.patch
 
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_sucompat.c.patch ./
-              patch -p1 --forward < fix_sucompat.c.patch
+              cp ../../kernel_patches/next/sucompat.patch ./
+              patch -p1 --forward < sucompat.patch
 
-              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_kernel_compat.c.patch ./
-              patch -p1 --forward < fix_kernel_compat.c.patch
+              cp ../../kernel_patches/next/kernel_compat.patch ./
+              patch -p1 --forward < kernel_compat.patch
               ;;
           esac
-
-      # - name: Getting KernelSU Version
-      #   run: |
-      #     echo "Changing to configuration directory: $CONFIG..."
-      #     cd kernel_workspace
-          
-      #     case "${{ inputs.kernelsu_variant }}" in
-      #       "KernelSU-Next")
-      #         cd ./KernelSU-Next
-      #         BASE_VERSION=10200
-      #         ;;
-      #     esac
-          
-      #     cd ./kernel
-      #     KSU_VERSION=$(expr $(/usr/bin/git rev-list --count HEAD) "+" $BASE_VERSION)
-      #     echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           
       - name: Apply Hooks Patches
         run: |
