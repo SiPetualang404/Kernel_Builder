@@ -232,7 +232,7 @@ jobs:
           cd ../common
           SUSFS_VERSION=$(grep '#define SUSFS_VERSION' ./include/linux/susfs.h | awk -F'"' '{print $2}')
           echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
-          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+          if [ "${{ inputs.android_version }}" = "android15" ] && [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
             if ! grep -qxF '#include <trace/hooks/fs.h>' ./fs/namespace.c; then
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
             fi
