@@ -160,11 +160,7 @@ jobs:
           
           echo "Initializing and syncing kernel source..."
           repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "${{ inputs.android_version }}" -m "${{ inputs.kernel_version }}.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          echo ">>> Trying optimized fetch sync..."
-          if ! repo sync -c --optimized-fetch --no-tags --no-clone-bundle -j$(nproc --all); then
-            echo ">>> Optimized fetch failed, retrying with force-sync..."
-            repo sync -c -j$(nproc --all) --no-clone-bundle --no-tags --force-sync
-          fi
+          repo sync -c -j$(nproc --all) --no-clone-bundle --no-tags --force-sync
 
           #rm -rf prebuilts/gcc
           #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
