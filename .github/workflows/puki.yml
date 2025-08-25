@@ -145,14 +145,26 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
           chmod a+rx ~/repo
           sudo mv ~/repo /usr/local/bin/repo
+          echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+          mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
 
+      - name: Restore repo cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.REPO_CACHE_DIR }}
+          key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
+      
       - name: Initialize and Sync Kernel Source
         run: |
           mkdir -p kernel_workspace && cd kernel_workspace
           
           echo "Initializing and syncing kernel source..."
-          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "android15" -m "6.6.30.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
-          repo sync --optimized-fetch -c --no-tags --no-clone-bundle -j$(nproc --all)
+          repo init -u https://github.com/tukangbecak01/kernel_manifest.git -b "${{ inputs.android_version }}" -m "${{ inputs.kernel_version }}.xml" --repo-rev=stable --depth=1 --no-clone-bundle --no-tags
+          echo ">>> Trying optimized fetch sync..."
+          if ! repo sync -c --optimized-fetch --no-tags --no-clone-bundle -j$(nproc --all); then
+            echo ">>> Optimized fetch failed, retrying with force-sync..."
+            repo sync -c -j$(nproc --all) --no-clone-bundle --no-tags --force-sync
+          fi
 
           #rm -rf prebuilts/gcc
           #git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git prebuilts/gcc
@@ -479,8 +491,14 @@ jobs:
           
           # Set Kernel Name
           sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
-          sudo sed -i 's/-4k/-android15-8-g7f19c751e334-ab13222567-4k/g' ./common/arch/arm64/configs/gki_defconfig
-
+          if [ "${{ inputs.kernel_version }}" = "6.6.30" ]; then
+            echo "TIME_BUILD=Thu Aug 29 05:01:15 UTC 2024" >> $GITHUB_ENV
+            sudo sed -i 's/-4k/-android15-8-g94c1a24cabd5-ab12293704-4k/g' ./common/arch/arm64/configs/gki_defconfig
+          elif [ "${{ inputs.kernel_version }}" = "6.6.56" ]; then
+            echo "TIME_BUILD=Tue Mar 11 12:18:17 UTC 2025" >> $GITHUB_ENV
+            sudo sed -i 's/-4k/-android15-8-g7f19c751e334-ab13222567-4k/g' ./common/arch/arm64/configs/gki_defconfig
+          fi
+          
           # Remove Abi Exports and Error
           sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
           rm -rf ./common/android/abi_gki_protected_exports_*
@@ -491,9 +509,10 @@ jobs:
           set -x
           cd kernel_workspace/common
           
-          export KBUILD_BUILD_TIMESTAMP="Tue Mar 11 12:18:17 UTC 2025"
+          export KBUILD_BUILD_TIMESTAMP="${{ env.TIME_BUILD }}"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/gcc/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
           export PATH="/usr/lib/ccache:$PATH"
 
