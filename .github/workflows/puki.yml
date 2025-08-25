@@ -515,7 +515,7 @@ jobs:
           echo "--- Clang Version ---"
           clang --version
           echo "--- GCC Version ---"
-          aarch64-buildroot-linux-gnu-gcc -v
+          aarch64-linux-gnu-gcc -v
                 
           make -j$(nproc --all) LLVM=0 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
           make -j$(nproc --all) LLVM=0 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
