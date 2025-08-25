@@ -508,7 +508,7 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="${{ env.TIME_BUILD }}"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/kernel-build-tools/linux-x86/bin:$PATH"
-          export PATH="$GITHUB_WORKSPACE/kernel_workspace//gcc/bin:$PATH"
+          export PATH="$GITHUB_WORKSPACE/kernel_workspace/gcc/bin:$PATH"
           export PATH="$GITHUB_WORKSPACE/kernel_workspace/prebuilts/rust/linux-x86/1.73.0b/bin:$PATH"
           export PATH="/usr/lib/ccache:$PATH"
 
@@ -517,8 +517,8 @@ jobs:
           echo "--- GCC Version ---"
           aarch64-buildroot-linux-gnu-gcc -v
                 
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
-          make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
+          make -j$(nproc --all) LLVM=0 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig || { echo "make defconfig failed"; exit 1; }
+          make -j$(nproc --all) LLVM=0 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 Image || { echo "make Image failed"; exit 1; }
 
       # - name: 📦 Apply KPM Patch (SukiSU only)
       #   if: ${{ inputs.use_kpm }}
