@@ -145,13 +145,13 @@ jobs:
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
           chmod a+rx ~/repo
           sudo mv ~/repo /usr/local/bin/repo
-          echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
-          mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
+          # echo "REPO_CACHE_DIR=$HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}" >> $GITHUB_ENV
+          # mkdir -p $HOME/.repo_${{ inputs.android_version }}-${{ inputs.kernel_version }}
 
       - name: Restore repo cache
         uses: actions/cache@v4
         with:
-          path: ${{ env.REPO_CACHE_DIR }}
+          path: kernel_workspace/.repo
           key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}
       
       - name: Initialize and Sync Kernel Source
