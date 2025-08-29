@@ -33,7 +33,7 @@ on:
         description: 'Starting from old to new?'
         required: false
         type: boolean
-        default: false
+        default: true
       # clear_cache:
       #   description: 'Delete all ccache caches?'
       #   required: false
