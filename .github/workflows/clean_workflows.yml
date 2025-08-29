@@ -133,7 +133,7 @@ jobs:
           done
 
           echo "Clear this workflow's run records (excluding the current run)..."
-          SELF_WORKFLOW_ID=$(gh api repos/$REPO/actions/workflows | jq -r '.workflows[] | select(.name == "Clean up workflow run records and cache") | .id')
+          SELF_WORKFLOW_ID=$(gh api repos/$REPO/actions/workflows | jq -r '.workflows[] | select(.name == "Clean up workflow s") | .id')
           if [ -n "$SELF_WORKFLOW_ID" ]; then
             SELF_RUNS=$(gh api "repos/$REPO/actions/workflows/$SELF_WORKFLOW_ID/runs?per_page=50" | jq -c '.workflow_runs[]')
             echo "$SELF_RUNS" | while read run; do
