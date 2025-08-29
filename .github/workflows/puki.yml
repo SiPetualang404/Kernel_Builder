@@ -242,8 +242,8 @@ jobs:
                 sed -i '/#include <trace\/hooks\/blk.h>/a #include <trace\/hooks\/fs.h>' ./fs/namespace.c
             fi
           fi
-          patch -p1 --fuzz=3 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
-          patch -p1 --fuzz=3 --forward < 69_hide_stuff.patch
+          patch -p1 --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ env.SERIES }}.patch || true
+          patch -p1 -F 3 < 69_hide_stuff.patch
           
       - name: Apply Hooks Patches
         run: |
@@ -252,88 +252,93 @@ jobs:
           if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
             echo "Applying hooks for KernelSU-Next..."
             cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
-            patch -p1 --fuzz=3 --forward < scope_min_manual_hooks_v1.4.patch
+            patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
           elif [ "${{ inputs.kernelsu_variant }}" = "SukiSU-Ultra" ]; then
             echo "Applying hooks for SukiSU..."
             if [ "${{ inputs.hook }}" = "Manual" ]; then
               cp ../../kernel_patches/sukisu/syscall_hooks.patch ./
-              patch -p1 --fuzz=3 --forward < syscall_hooks.patch
+              patch -p1 -F 3 < syscall_hooks.patch
             elif [ "${{ inputs.hook }}" = "Tracepoint" ]; then
               cp ../../kernel_patches/sukisu/tracepoint_hooks.patch ./
-              patch -p1 --fuzz=3 --forward < tracepoint_hooks.patch
+              patch -p1 -F 3 < tracepoint_hooks.patch
             fi
           fi
           
-      - name: Updated LZ4 to v1.10.0
+      - name: Upgrade LZ4 to 1.10.0
         run: |
-          LZ4_VERSION="1.10.0"
-          LZ4_DOWNLOAD_URL="https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz"
           cd kernel_workspace/common
-          mkdir -p lz4_temp && cd lz4_temp
-          echo "Download LZ4 ${LZ4_VERSION} source code..."
-          curl -Ls "${LZ4_DOWNLOAD_URL}" -o lz4.tar.gz
-          tar -zxf lz4.tar.gz --strip-components=1
+          files=(
+              "lib/lz4/lz4_compress.c"
+              "lib/lz4/lz4_decompress.c"
+              "lib/lz4/lz4defs.h"
+              "lib/lz4/lz4hc_compress.c"
+          )
 
-          # Copy the files and use independent names to avoid conflicts with LZ4K
-          echo "Copy the LZ4 file to the kernel directory..."
-          # Source code file (add "lz4v2_" prefix)
-          cp lib/lz4.c ../lib/lz4v2_core.c
-          cp lib/lz4.h ../lib/lz4v2_core.h
-          cp lib/lz4hc.c ../lib/lz4v2_hc.c
-          cp lib/lz4hc.h ../lib/lz4v2_hc.h
-          # Header file (put in a separate path）
-          mkdir -p ../include/linux/lz4v2
-          cp lib/lz4.h ../include/linux/lz4v2/lz4.h
-          cp lib/lz4hc.h ../include/linux/lz4v2/lz4hc.h
+          for file in "${files[@]}"; do
+            if [ -e "$file" ]; then
+                rm "$file"
+                echo "$file has been deleted"
+            else
+                echo "$file does not exist"
+            fi
+          done
 
-          # Globally rename functions and macros (complete namespace isolation)
-          echo "Rename symbols to avoid conflicts..."
-          # Core compression functions renamed
-          sed -i 's/LZ4_compress_default/lz4v2_compress_default/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
-          sed -i 's/LZ4_decompress_safe/lz4v2_decompress_safe/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h
-          # HC high compression function rename
-          sed -i 's/LZ4_compress_HC/lz4v2_compress_HC/g' ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
-          # Internal macros and helper functions renamed
-          sed -i 's/LZ4_/LZ4V2_/g' ../lib/lz4v2_core.c ../lib/lz4v2_core.h ../lib/lz4v2_hc.c ../lib/lz4v2_hc.h
-          
-          # Add kernel compatibility adaptation
-          echo "Add kernel adaptation code..."
-          # Introduce necessary kernel header files
-          sed -i '1i#include <linux/types.h>' ../lib/lz4v2_core.c
-          sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_core.c
-          sed -i '3i#include <linux/module.h>' ../lib/lz4v2_core.c
-          # HC files are processed similarly
-          sed -i '1i#include <linux/types.h>' ../lib/lz4v2_hc.c
-          sed -i '2i#include <linux/kernel.h>' ../lib/lz4v2_hc.c
-          sed -i '3i#include <linux/module.h>' ../lib/lz4v2_hc.c
+          cp -r ../../kernel_patches/zram/lz4/* ./lib/lz4/
+          cp -r ../../kernel_patches/zram/include/linux/* ./include/linux/
+          cp -r ../../kernel_patches/zram/${{ env.SERIES }}/lz4_1.10.0.patch ./
+          patch -p1 -F 3 --fuzz=5 < lz4_1.10.0.patch || true
 
-          # Add module declaration (conforming to kernel spec)
-          echo "Add module metadata..."
-          cat >> ../lib/lz4v2_core.c << 'EOF'
-          MODULE_LICENSE("GPL");
-          MODULE_DESCRIPTION("LZ4 1.10.0 Compression (v2)");
-          MODULE_AUTHOR("LZ4 Project");
-          EXPORT_SYMBOL(lz4v2_compress_default);
-          EXPORT_SYMBOL(lz4v2_decompress_safe);
-          EOF
-
-          cat >> ../lib/lz4v2_hc.c << 'EOF'
-          MODULE_LICENSE("GPL");
-          MODULE_DESCRIPTION("LZ4HC 1.10.0 Compression (v2)");
-          MODULE_AUTHOR("LZ4 Project");
-          EXPORT_SYMBOL(lz4v2_compress_HC);
-          EOF
-
-          # Update Makefile to ensure compilation
-          echo "Update Makefile configuration..."
-          if ! grep -q "lz4v2_core.o" ../lib/Makefile; then
-            echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_core.o" >> ../lib/Makefile
-            echo "obj-\$(CONFIG_LZ4V2_COMPRESS) += lz4v2_hc.o" >> ../lib/Makefile
+          # Check if the file exists
+          if [ -f "fs/f2fs/Makefile" ]; then
+            # Check if the specified line is included
+            if ! grep -qF "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" "fs/f2fs/Makefile"; then
+              echo "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" >> "fs/f2fs/Makefile"
+              echo "Added: f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o"
+            else
+              echo "File already contains: f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o"
+            fi
+          else
+            echo "File does not exist: fs/f2fs/Makefile"
           fi
 
-          # Clean temporary files
-          cd .. && rm -rf lz4_temp
-          echo "LZ4 ${LZ4_VERSION} integration completed"
+      - name: Apply LZ4KD & ZSTDN patches
+        if: ${{ inputs.use_zram }}
+        run: |
+          cd kernel_workspace/common
+          cp -r ../../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/lib/* ./lib/
+          cp -r ../../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
+
+          cp ../../SukiSU_patch/other/zram/zram_patch/${{ env.SERIES }}/lz4kd.patch ./
+          echo "Applying lz4kd patch"
+          patch -p1 -F 3 < lz4kd.patch || true
+          echo 'Completed LZ4KD patch'
+
+      - name: LZ4KD & ZSTDN Configuration
+        if: ${{ inputs.use_zram }}
+        run: |
+          set -x
+          set -e
+          echo "Write LZ4KD & ZSTDN config dependency"
+          CONFIG_FILE="kernel_workspace/common/arch/arm64/configs/gki_defconfig"
+
+          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+            sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+          fi
+
+          if [ "${{ inputs.android_version }}" = "android15" ]; then
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
+            echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
+          fi
+          
+          if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
+            echo "CONFIG_CRYPTO_LZ4HC=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
+            echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
+            echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
+          fi
           
       - name: Apply ECN and TCP Pacing Tweaks
         run: |
@@ -344,7 +349,7 @@ jobs:
           sed -i 's/net->ipv4.sysctl_tcp_pacing_ss_ratio = 200;/net->ipv4.sysctl_tcp_pacing_ss_ratio = 150;/' "$TCP_IPV4_PATH"
           sed -i 's/net->ipv4.sysctl_tcp_pacing_ca_ratio = 120;/net->ipv4.sysctl_tcp_pacing_ca_ratio = 110;/' "$TCP_IPV4_PATH"
           echo "ECN and TCP Pacing tweaks successfully applied."
-          
+
       - name: Add Configuration Settings
         run: |
           cd kernel_workspace
@@ -386,15 +391,6 @@ jobs:
               set_config CONFIG_KSU_TRACEPOINT_HOOK y 
             fi
           fi
-
-          # LZ4 1.10.0
-          set_config CONFIG_LZ4V2_COMPRESS y
-          set_config CONFIG_LZ4V2_HC y
-          set_config CONFIG_LZ4V2_DEBUG n
-          
-          # Enable advanced compression support
-          set_config CONFIG_CRYPTO_LZ4 y
-          set_config CONFIG_CRYPTO_LZ4HC y
           
           # File system level compression support
           set_config CONFIG_F2FS_FS_COMPRESSION y
