@@ -1,0 +1,189 @@
+name: Clean up workflow run records and cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_name:
+        type: choice
+        description: 'Cleaned workflow name?'
+        required: true
+        default: 'GKI Build Kernel'
+        options:
+          - GKI Build Kernel
+      count:
+        description: 'The amount to be deleted?'
+        required: false
+        default: '20'
+      delete_failed:
+        description: 'Delete the failed running records of the specified workflow?'
+        required: false
+        type: boolean
+        default: true
+      delete_success:
+        description: 'Delete the successful running records of the specified workflow?'
+        required: false
+        type: boolean
+        default: false
+      delete_cancelled:
+        description: 'Delete the canceled running records of the specified workflow?'
+        required: false
+        type: boolean
+        default: false
+      reverse_order:
+        description: 'Starting from old to new?'
+        required: false
+        type: boolean
+        default: false
+      clear_cache:
+        description: 'Delete all ccache caches?'
+        required: false
+        type: boolean
+        default: false
+      cancel_all:
+        description: 'Do you want to cancel all runs of a specified workflows with one click?'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Installation environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq
+
+      - name: Authenticating with the GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Clean up the specified workflow running records
+        env:
+          REPO: ${{ github.repository }}
+          COUNT: ${{ inputs.count }}
+          DELETE_FAILED: ${{ inputs.delete_failed }}
+          DELETE_SUCCESS: ${{ inputs.delete_success }}
+          DELETE_CANCELLED: ${{ inputs.delete_cancelled }}
+          REVERSE_ORDER: ${{ inputs.reverse_order }}
+          CANCEL_ALL: ${{ inputs.cancel_all }}
+          WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -e
+
+          echo "Finding the ID of workflow \"$WORKFLOW_NAME\"..."
+          WORKFLOW_ID=$(gh api repos/$REPO/actions/workflows | jq -r ".workflows[] | select(.name == \"$WORKFLOW_NAME\") | .id")
+          if [ -z "$WORKFLOW_ID" ]; then
+            echo "Workflow \"$WORKFLOW_NAME\" not found, exiting."
+            exit 1
+          fi
+
+          echo "Start paging to get all running records..."
+          PER_PAGE=100
+          PAGE=1
+          ALL_RUNS="[]"
+          while true; do
+            RESP=$(gh api "repos/$REPO/actions/workflows/$WORKFLOW_ID/runs?per_page=$PER_PAGE&page=$PAGE")
+            RUNS=$(echo "$RESP" | jq '.workflow_runs')
+            COUNT_THIS_PAGE=$(echo "$RUNS" | jq 'length')
+            if [ "$COUNT_THIS_PAGE" -eq 0 ]; then break; fi
+            ALL_RUNS=$(jq -s 'add' <(echo "$ALL_RUNS") <(echo "$RUNS"))
+            PAGE=$((PAGE + 1))
+          done
+
+          echo "A total of $(echo "$ALL_RUNS" | jq 'length') run records were obtained."
+
+          if [[ "$CANCEL_ALL" == "true" ]]; then
+            echo "Start canceling an ongoing or queued run..."
+            CANCEL_COUNT=0
+            echo "$ALL_RUNS" | jq -c '.[] | select(.status == "in_progress" or .status == "queued")' | while read run; do
+              ID=$(echo "$run" | jq -r '.id')
+              if [[ "$ID" == "$CURRENT_RUN_ID" ]]; then continue; fi
+              echo "Cancel run ID: $ID"
+              gh api -X POST "repos/$REPO/actions/runs/$ID/cancel" && CANCEL_COUNT=$((CANCEL_COUNT + 1))
+            done
+            echo "$CANCEL_COUNT runs canceled."
+          fi
+
+          echo "Starting to process the delete logic..."
+          if [[ "$REVERSE_ORDER" == "true" ]]; then
+            SORTED_RUNS=$(echo "$ALL_RUNS" | jq 'sort_by(.run_started_at)')
+          else
+            SORTED_RUNS=$(echo "$ALL_RUNS" | jq 'sort_by(.run_started_at) | reverse')
+          fi
+
+          TO_DELETE_RUNS=$(echo "$SORTED_RUNS" | jq ".[0:${COUNT}]")
+
+          echo "$TO_DELETE_RUNS" | jq -c '.[]' | while read run; do
+            ID=$(echo "$run" | jq -r '.id')
+            STATUS=$(echo "$run" | jq -r '.conclusion')
+            STATE=$(echo "$run" | jq -r '.status')
+
+            if [[ "$STATE" == "in_progress" || "$STATE" == "queued" ]]; then continue; fi
+            if [[ "$STATUS" == "failure" && "$DELETE_FAILED" != "true" ]]; then continue; fi
+            if [[ "$STATUS" == "success" && "$DELETE_SUCCESS" != "true" ]]; then continue; fi
+            if [[ "$STATUS" == "cancelled" && "$DELETE_CANCELLED" != "true" ]]; then continue; fi
+
+            echo "Delete run record ID: $ID"
+            gh api -X DELETE "repos/$REPO/actions/runs/$ID" || echo "Delete failed"
+          done
+
+          echo "Clear this workflow's run records (excluding the current run)..."
+          SELF_WORKFLOW_ID=$(gh api repos/$REPO/actions/workflows | jq -r '.workflows[] | select(.name == "Clean up workflow run records and cache") | .id')
+          if [ -n "$SELF_WORKFLOW_ID" ]; then
+            SELF_RUNS=$(gh api "repos/$REPO/actions/workflows/$SELF_WORKFLOW_ID/runs?per_page=50" | jq -c '.workflow_runs[]')
+            echo "$SELF_RUNS" | while read run; do
+              ID=$(echo "$run" | jq -r '.id')
+              if [[ "$ID" == "$CURRENT_RUN_ID" ]]; then continue; fi
+              echo "Delete the workflow running record ID: $ID"
+              gh api -X DELETE "repos/$REPO/actions/runs/$ID" || echo "Delete failed"
+            done
+          fi
+
+  clean-caches:
+    runs-on: ubuntu-latest
+    needs: cleanup
+    if: ${{ inputs.clear_cache == 'true' }}
+    permissions:
+      actions: write
+    steps:
+      - name: Delete and reset the cache
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let totalDeleted = 0;
+            let page = 1;
+
+            while (true) {
+              const res = await github.rest.actions.getActionsCacheList({
+                owner,
+                repo,
+                per_page: 100,
+                page: page
+              });
+
+              const caches = res.data.actions_caches;
+              if (!caches || caches.length === 0) break;
+
+              for (const cache of caches) {
+                if (cache.key.startsWith('ccache-')) {
+                  console.log(`Delete cache: ${cache.key}`);
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner,
+                    repo,
+                    cache_id: cache.id
+                  });
+                  totalDeleted++;
+                }
+              }
+
+              if (caches.length < 100) break;
+              page++;
+            }
+
+            console.log(`共删除缓存数量: ${totalDeleted}`);
