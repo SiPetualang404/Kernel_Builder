@@ -7,9 +7,9 @@ on:
         type: choice
         description: 'Cleaned workflow name?'
         required: true
-        default: 'GKI Build Kernel'
+        default: 'GKI Kernel Build'
         options:
-          - GKI Build Kernel
+          - GKI Kernel Build
       count:
         description: 'The amount to be deleted?'
         required: false
