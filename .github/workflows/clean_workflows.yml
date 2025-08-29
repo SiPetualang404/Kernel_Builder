@@ -1,4 +1,4 @@
-name: Clean up workflow run records and cache
+name: Clean up workflows
 
 on:
   workflow_dispatch:
