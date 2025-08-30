@@ -323,12 +323,9 @@ jobs:
           echo "Write LZ4KD & ZSTDN config dependency"
           CONFIG_FILE="kernel_workspace/common/arch/arm64/configs/gki_defconfig"
 
-          if [ "${{ env.SERIES }}" = "6.6" ]; then
+          if [ "${{ env.SERIES }}" = "6.6" ] && [ "${{ inputs.android_version }}" = "android15" ]; then
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
             sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
-          fi
-
-          if [ "${{ inputs.android_version }}" = "android15" ]; then
             sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "kernel_workspace/common/modules.bzl"
             echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
           fi
