@@ -176,6 +176,7 @@ jobs:
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.android_version }}-${{ env.SERIES }}
           git clone https://github.com/tukangbecak01/kernel_patches.git
           git clone https://github.com/tukangbecak01/AnyKernel3.git
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
           
           cd kernel_workspace
           if [ "${{ inputs.kernelsu_variant }}" = "KernelSU-Next" ]; then
