@@ -323,7 +323,7 @@ jobs:
           echo "Write LZ4KD & ZSTDN config dependency"
           CONFIG_FILE="kernel_workspace/common/arch/arm64/configs/gki_defconfig"
 
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+          if [ "${{ env.SERIES }}" = "6.6" ]; then
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
             sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
           fi
