@@ -42,7 +42,7 @@ on:
         required: true
         type: boolean
         default: true
-      use_net:
+      use_zram:
         description: 'Enable network optimization features (proxy, IPv6, etc.)'
         required: true
         type: boolean
@@ -328,7 +328,7 @@ jobs:
           fi
 
           if [ "${{ inputs.android_version }}" = "android15" ]; then
-            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$CONFIG/common/modules.bzl"
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "kernel_workspace/common/modules.bzl"
             echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
           fi
           
@@ -442,33 +442,6 @@ jobs:
             set_config CONFIG_TCP_CONG_WESTWOOD n
             set_config CONFIG_TCP_CONG_HTCP n
             set_config CONFIG_DEFAULT_BBR y
-          fi
-
-          if [ "${{ inputs.use_net }}" = "true" ]; then
-            # NET Configuration
-            set_config CONFIG_NETFILTER_XT_MATCH_ADDRTYPE y
-            set_config CONFIG_NETFILTER_XT_SET y
-            set_config CONFIG_IP_SET y
-            set_config CONFIG_IP_SET_MAX 65534
-            set_config CONFIG_IP_SET_BITMAP_IP y
-            set_config CONFIG_IP_SET_BITMAP_IPMAC y
-            set_config CONFIG_IP_SET_BITMAP_PORT y
-            set_config CONFIG_IP_SET_HASH_IP y
-            set_config CONFIG_IP_SET_HASH_IPMARK y
-            set_config CONFIG_IP_SET_HASH_IPPORT y
-            set_config CONFIG_IP_SET_HASH_IPPORTIP y
-            set_config CONFIG_IP_SET_HASH_IPPORTNET y
-            set_config CONFIG_IP_SET_HASH_IPMAC y
-            set_config CONFIG_IP_SET_HASH_MAC y
-            set_config CONFIG_IP_SET_HASH_NETPORTNET y
-            set_config CONFIG_IP_SET_HASH_NET y
-            set_config CONFIG_IP_SET_HASH_NETNET y
-            set_config CONFIG_IP_SET_HASH_NETPORT y
-            set_config CONFIG_IP_SET_HASH_NETIFACE y
-            set_config CONFIG_IP_SET_LIST_SET y
-            set_config CONFIG_IP6_NF_NAT y
-            set_config CONFIG_IP6_NF_IPTABLES y
-            set_config CONFIG_IP6_NF_TARGET_MASQUERADE y
           fi
           
           # Remove check_defconfig
